@@ -861,10 +861,6 @@ static int snd_compr_partial_drain(struct snd_compr_stream *stream)
 	if (stream->direction == SND_COMPRESS_CAPTURE)
 		return -EPERM;
 
-	/* partial drain doesn't have any meaning for capture streams */
-	if (stream->direction == SND_COMPRESS_CAPTURE)
-		return -EPERM;
-
 	/* stream can be drained only when next track has been signalled */
 	if (stream->next_track == false)
 		return -EPERM;
