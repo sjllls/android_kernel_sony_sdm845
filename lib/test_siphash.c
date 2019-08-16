@@ -20,8 +20,8 @@
 #include <linux/errno.h>
 #include <linux/module.h>
 
-/* Test vectors taken from reference source available at:
- *     https://github.com/veorq/SipHash
+/* Test vectors taken from official reference source available at:
+ *     https://131002.net/siphash/siphash24.c
  */
 
 static const siphash_key_t test_key_siphash =
