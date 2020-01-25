@@ -157,3 +157,8 @@ config DRM_SDE_SPECIFIC_PANEL
 	---help---
 	The MDSS Specific Panel provides support for specific panel driver
 	file.
+
+config FENCE_DEBUG
+	bool "Print fence name to userspace"
+	depends on DRM_MSM
+	default n
