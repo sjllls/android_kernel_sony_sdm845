@@ -7,11 +7,6 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 #include <linux/moduleparam.h>
 #include <linux/export.h>
 #include <linux/debugfs.h>
@@ -280,7 +275,7 @@ static int mmc_scale_set(void *data, u64 val)
 	mmc_host_clk_hold(host);
 
 	/* change frequency from sysfs manually */
-	err = mmc_clk_update_freq(host, val, host->clk_scaling.state);
+	err = mmc_clk_update_freq(host, val, host->clk_scaling.state, 0);
 	if (err == -EAGAIN)
 		err = 0;
 	else if (err)
@@ -552,7 +547,7 @@ static int mmc_dbg_card_status_get(void *data, u64 *val)
 
 	mmc_get_card(card);
 	if (mmc_card_cmdq(card)) {
-		ret = mmc_cmdq_halt_on_empty_queue(card->host);
+		ret = mmc_cmdq_halt_on_empty_queue(card->host, 0);
 		if (ret) {
 			pr_err("%s: halt failed while doing %s err (%d)\n",
 					mmc_hostname(card->host), __func__,
@@ -594,7 +589,7 @@ static int mmc_ext_csd_open(struct inode *inode, struct file *filp)
 
 	mmc_get_card(card);
 	if (mmc_card_cmdq(card)) {
-		err = mmc_cmdq_halt_on_empty_queue(card->host);
+		err = mmc_cmdq_halt_on_empty_queue(card->host, 0);
 		if (err) {
 			pr_err("%s: halt failed while doing %s err (%d)\n",
 					mmc_hostname(card->host), __func__,

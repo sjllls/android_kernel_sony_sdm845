@@ -10,11 +10,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #define pr_fmt(fmt) "dsi-phy-hw:" fmt
 #include <linux/math64.h>
@@ -368,7 +363,8 @@ int dsi_phy_hw_v3_0_wait_for_lane_idle(
 	pr_debug("%s: polling for lanes to be in stop state, mask=0x%08x\n",
 		__func__, stop_state_mask);
 	rc = readl_poll_timeout(phy->base + DSIPHY_CMN_LANE_STATUS1, val,
-			(val == stop_state_mask), sleep_us, timeout_us);
+				((val & stop_state_mask) == stop_state_mask),
+				sleep_us, timeout_us);
 	if (rc) {
 		pr_err("%s: lanes not in stop state, LANE_STATUS=0x%08x\n",
 			__func__, val);

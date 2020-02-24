@@ -11,11 +11,6 @@
  * GNU General Public License for more details.
  *
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #ifndef _DSI_DISPLAY_H_
 #define _DSI_DISPLAY_H_
@@ -664,7 +659,6 @@ enum dsi_pixel_format dsi_display_get_dst_format(void *display);
  * Return: Zero on Success
  */
 int dsi_display_cont_splash_config(void *display);
-
 /*
  * dsi_display_get_panel_vfp - get panel vsync
  * @display: Pointer to private display structure

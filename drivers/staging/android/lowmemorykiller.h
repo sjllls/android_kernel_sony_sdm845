@@ -1,10 +1,3 @@
-/*
- * Copyright (C) 2018 Sony Mobile Communications Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2, as
- * published by the Free Software Foundation.
- */
 #ifndef __LOWMEMORYKILLER_H
 #define __LOWMEMORYKILLER_H
 
@@ -12,6 +5,8 @@
 
 /* The lowest score LMK is using */
 #define LMK_SCORE_THRESHOLD 0
+#define LMK_TRACE_OOMKILL (-1)
+#define LMK_TRACE_MEMERROR (-2)
 
 extern u32 lowmem_debug_level;
 
@@ -27,9 +22,11 @@ struct calculated_params {
 	long minfree;
 	int other_file;
 	int other_free;
+	int margin;
 	int dynamic_max_queue_len;
 	short selected_oom_score_adj;
 	short min_score_adj;
+	int kill_reason;
 };
 
 int kill_needed(int level, gfp_t mask,
@@ -38,7 +35,6 @@ void print_obituary(struct task_struct *doomed,
 		    struct calculated_params *cp,
 		    gfp_t gfp_mask);
 
-void balance_cache(void);
 ssize_t get_task_rss(struct task_struct *tsk);
 
 /* kernel does not have a task_trylock and
@@ -63,8 +59,8 @@ static inline int task_trylock_lmk(struct task_struct *p)
 #else
 #define LMK_TAG_TASK_DIE(x)			\
 	do {					\
+		task_set_lmk_waiting(x);	\
 		if (x->mm) {			\
-			task_set_lmk_waiting(x);\
 			if (!test_bit(MMF_OOM_SKIP, &x->mm->flags) && \
 			    oom_reaper) { \
 				mark_lmk_victim(x); \

@@ -9,11 +9,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #define pr_fmt(fmt)	"flashv2: %s: " fmt, __func__
 
@@ -452,6 +447,12 @@ static int qpnp_flash_led_init_settings(struct qpnp_flash_led *led)
 
 		val |= 0x1 << led->fnode[i].id;
 
+		rc = qpnp_flash_led_write(led,
+			FLASH_LED_REG_SAFETY_TMR(led->base + addr_offset),
+			FLASH_LED_SAFETY_TMR_DISABLED);
+		if (rc < 0)
+			return rc;
+
 		if (led->fnode[i].strobe_sel == HW_STROBE) {
 			if (led->fnode[i].id == LED3)
 				strobe_mask |= LED3_FLASH_ONCE_ONLY_BIT;
@@ -759,8 +760,11 @@ static int get_property_from_fg(struct qpnp_flash_led *led,
 	union power_supply_propval pval = {0, };
 
 	if (!led->bms_psy) {
-		pr_err("no bms psy found\n");
-		return -EINVAL;
+		led->bms_psy = power_supply_get_by_name("bms");
+		if (!led->bms_psy) {
+			pr_err_ratelimited("Couldn't get bms_psy\n");
+			return -ENODEV;
+		}
 	}
 
 	rc = power_supply_get_property(led->bms_psy, prop, &pval);
@@ -1332,6 +1336,12 @@ static int qpnp_flash_led_switch_disable(struct flash_switch_data *snode)
 		rc = qpnp_flash_led_masked_write(led,
 			FLASH_LED_REG_TGR_CURRENT(led->base + addr_offset),
 			FLASH_LED_CURRENT_MASK, 0);
+		if (rc < 0)
+			return rc;
+
+		rc = qpnp_flash_led_write(led,
+			FLASH_LED_REG_SAFETY_TMR(led->base + addr_offset),
+			FLASH_LED_SAFETY_TMR_DISABLED);
 		if (rc < 0)
 			return rc;
 
@@ -1946,41 +1956,6 @@ static struct device_attribute qpnp_flash_fnode_attrs[] = {
 				qpnp_flash_led_ires_ua_show,
 				qpnp_flash_led_ires_ua_store),
 };
-
-static int flash_led_psy_notifier_call(struct notifier_block *nb,
-		unsigned long ev, void *v)
-{
-	struct power_supply *psy = v;
-	struct qpnp_flash_led *led =
-			container_of(nb, struct qpnp_flash_led, nb);
-
-	if (ev != PSY_EVENT_PROP_CHANGED)
-		return NOTIFY_OK;
-
-	if (!strcmp(psy->desc->name, "bms")) {
-		led->bms_psy = power_supply_get_by_name("bms");
-		if (!led->bms_psy)
-			pr_err("Failed to get bms power_supply\n");
-		else
-			power_supply_unreg_notifier(&led->nb);
-	}
-
-	return NOTIFY_OK;
-}
-
-static int flash_led_psy_register_notifier(struct qpnp_flash_led *led)
-{
-	int rc;
-
-	led->nb.notifier_call = flash_led_psy_notifier_call;
-	rc = power_supply_reg_notifier(&led->nb);
-	if (rc < 0) {
-		pr_err("Couldn't register psy notifier, rc = %d\n", rc);
-		return rc;
-	}
-
-	return 0;
-}
 
 /* irq handler */
 static irqreturn_t qpnp_flash_led_irq_handler(int irq, void *_led)
@@ -2987,15 +2962,6 @@ static int qpnp_flash_led_probe(struct platform_device *pdev)
 		if (rc < 0) {
 			pr_err("Unable to request led_fault(%d) IRQ(err:%d)\n",
 				led->pdata->led_fault_irq, rc);
-			goto error_switch_register;
-		}
-	}
-
-	led->bms_psy = power_supply_get_by_name("bms");
-	if (!led->bms_psy) {
-		rc = flash_led_psy_register_notifier(led);
-		if (rc < 0) {
-			pr_err("Couldn't register psy notifier, rc = %d\n", rc);
 			goto error_switch_register;
 		}
 	}

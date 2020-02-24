@@ -2,7 +2,7 @@
  * drivers/staging/android/ion/ion_page_pool.c
  *
  * Copyright (C) 2011 Google, Inc.
- * Copyright (c) 2016, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016, 2018 The Linux Foundation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -13,11 +13,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
  */
 
 #include <linux/debugfs.h>
@@ -83,6 +78,9 @@ static int ion_page_pool_add(struct ion_page_pool *pool, struct page *page)
 		pool->low_count++;
 	}
 
+	mod_node_page_state(page_pgdat(page), NR_INDIRECTLY_RECLAIMABLE_BYTES,
+			    (1 << (PAGE_SHIFT + pool->order)));
+
 	if (pool->inode && pool->order == 0)
 		__SetPageMovable(page, pool->inode->i_mapping);
 	mutex_unlock(&pool->mutex);
@@ -106,6 +104,8 @@ static struct page *ion_page_pool_remove(struct ion_page_pool *pool, bool high)
 	clear_bit(ION_PAGE_CACHE, &page->private);
 
 	list_del_init(&page->lru);
+	mod_node_page_state(page_pgdat(page), NR_INDIRECTLY_RECLAIMABLE_BYTES,
+			    -(1 << (PAGE_SHIFT + pool->order)));
 	return page;
 }
 

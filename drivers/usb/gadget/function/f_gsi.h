@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,11 +9,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details
- */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
  */
 
 #ifndef _F_GSI_H
@@ -37,6 +32,7 @@
 #include "configfs.h"
 
 #define GSI_RMNET_CTRL_NAME "rmnet_ctrl"
+#define GSI_RMNET_V2X_CTRL_NAME "rmnet_v2x_ctrl"
 #define GSI_MBIM_CTRL_NAME "android_mbim"
 #define GSI_DPL_CTRL_NAME "dpl_ctrl"
 #define ETHER_RMNET_CTRL_NAME "rmnet_ctrl0"
@@ -44,7 +40,7 @@
 #define GSI_GPS_CTRL_NAME "gps"
 
 #define GSI_CTRL_NAME_LEN (sizeof(GSI_MBIM_CTRL_NAME)+2)
-#define GSI_MAX_CTRL_PKT_SIZE 4096
+#define GSI_MAX_CTRL_PKT_SIZE 8192
 #define GSI_CTRL_DTR (1 << 0)
 
 #define GSI_NUM_IN_RNDIS_BUFFERS 50
@@ -75,10 +71,6 @@
 /* default pkt alignment factor */
 #define DEFAULT_PKT_ALIGNMENT_FACTOR 4
 
-#define GSI_MBIM_IOCTL_MAGIC 'o'
-#define GSI_MBIM_GET_NTB_SIZE  _IOR(GSI_MBIM_IOCTL_MAGIC, 2, u32)
-#define GSI_MBIM_GET_DATAGRAM_COUNT  _IOR(GSI_MBIM_IOCTL_MAGIC, 3, u16)
-#define GSI_MBIM_EP_LOOKUP _IOR(GSI_MBIM_IOCTL_MAGIC, 4, struct ep_info)
 #define GSI_MBIM_DATA_EP_TYPE_HSUSB 0x2
 /* ID for Microsoft OS String */
 #define GSI_MBIM_OS_STRING_ID 0xEE
@@ -134,6 +126,7 @@ enum usb_prot_id {
 	USB_PROT_RMNET_IPA,
 	USB_PROT_MBIM_IPA,
 	USB_PROT_DIAG_IPA,
+	USB_PROT_RMNET_V2X_IPA,
 
 	/* non-accelerated */
 	USB_PROT_RMNET_ETHER,
@@ -151,9 +144,9 @@ struct event_queue {
 };
 
 struct gsi_ntb_info {
-	u32	ntb_input_size;
-	u16	ntb_max_datagrams;
-	u16	reserved;
+	__u32	ntb_input_size;
+	__u16	ntb_max_datagrams;
+	__u16	reserved;
 };
 
 struct gsi_ctrl_pkt {
@@ -227,6 +220,10 @@ struct gsi_ctrl_port {
 	unsigned int modem_to_host;
 	unsigned int cpkt_drop_cnt;
 	unsigned int get_encap_cnt;
+
+	struct device *dev;
+	struct work_struct uevent_work;
+	struct workqueue_struct *uevent_wq;
 };
 
 struct gsi_data_port {
@@ -284,6 +281,8 @@ struct f_gsi {
 	struct gsi_data_port d_port;
 	struct gsi_ctrl_port c_port;
 	bool rmnet_dtr_status;
+
+	bool rwake_inprogress;
 
 	/* To test remote wakeup using debugfs */
 	struct timer_list gsi_rw_timer;
@@ -343,6 +342,8 @@ static int name_to_prot_id(const char *name)
 		return USB_PROT_MBIM_IPA;
 	if (!strncasecmp(name, "dpl", MAX_INST_NAME_LEN))
 		return USB_PROT_DIAG_IPA;
+	if (!strncasecmp(name, "rmnet.v2x", MAX_INST_NAME_LEN))
+		return USB_PROT_RMNET_V2X_IPA;
 	if (!strncasecmp(name, "rmnet.ether", MAX_INST_NAME_LEN))
 		return USB_PROT_RMNET_ETHER;
 	if (!strncasecmp(name, "dpl.ether", MAX_INST_NAME_LEN))

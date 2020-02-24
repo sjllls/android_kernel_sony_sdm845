@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,11 +8,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
  */
 
 #include <linux/debugfs.h>
@@ -175,6 +170,7 @@ struct smb_dt_props {
 	bool	hvdcp_disable;
 	bool	auto_recharge_soc;
 	int	wd_bark_time;
+	bool	no_pd;
 };
 
 struct smb2 {
@@ -238,6 +234,9 @@ static int smb2_parse_dt(struct smb2 *chip)
 		return -EINVAL;
 	}
 
+	chg->reddragon_ipc_wa = of_property_read_bool(node,
+				"qcom,qcs605-ipc-wa");
+
 	chg->step_chg_enabled = of_property_read_bool(node,
 				"qcom,step-charging-enable");
 
@@ -251,6 +250,9 @@ static int smb2_parse_dt(struct smb2 *chip)
 
 	chip->dt.no_battery = of_property_read_bool(node,
 						"qcom,batteryless-platform");
+
+	chip->dt.no_pd = of_property_read_bool(node,
+						"qcom,pd-not-supported");
 
 	rc = of_property_read_u32(node,
 				"qcom,fcc-max-ua", &chg->batt_profile_fcc_ua);
@@ -528,6 +530,9 @@ static int smb2_parse_dt(struct smb2 *chip)
 
 	chg->disable_stat_sw_override = of_property_read_bool(node,
 					"qcom,disable-stat-sw-override");
+
+	chg->fcc_stepper_enable = of_property_read_bool(node,
+					"qcom,fcc-stepping-enable");
 
 #if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	chg->jeita_sw_ctl_en = of_property_read_bool(node,
@@ -1318,6 +1323,7 @@ static enum power_supply_property smb2_batt_props[] = {
 	POWER_SUPPLY_PROP_CURRENT_NOW,
 	POWER_SUPPLY_PROP_CURRENT_QNOVO,
 	POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX,
+	POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT,
 	POWER_SUPPLY_PROP_TEMP,
 	POWER_SUPPLY_PROP_TECHNOLOGY,
 	POWER_SUPPLY_PROP_STEP_CHARGING_ENABLED,
@@ -1333,6 +1339,7 @@ static enum power_supply_property smb2_batt_props[] = {
 	POWER_SUPPLY_PROP_CHARGE_COUNTER,
 	POWER_SUPPLY_PROP_CHARGE_FULL,
 	POWER_SUPPLY_PROP_CYCLE_COUNT,
+	POWER_SUPPLY_PROP_FCC_STEPPER_ENABLE,
 #if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	POWER_SUPPLY_PROP_SYSTEM_TEMP_LEVEL,
 	POWER_SUPPLY_PROP_SMART_CHARGING_ACTIVATION,
@@ -1436,6 +1443,10 @@ static int smb2_batt_get_prop(struct power_supply *psy,
 		val->intval = get_client_vote(chg->fcc_votable,
 					      BATT_PROFILE_VOTER);
 		break;
+	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT:
+		val->intval = get_client_vote(chg->fcc_votable,
+					      FG_ESR_VOTER);
+		break;
 	case POWER_SUPPLY_PROP_TECHNOLOGY:
 		val->intval = POWER_SUPPLY_TECHNOLOGY_LION;
 		break;
@@ -1466,9 +1477,16 @@ static int smb2_batt_get_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CHARGE_FULL:
 	case POWER_SUPPLY_PROP_CYCLE_COUNT:
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-	case POWER_SUPPLY_PROP_CURRENT_NOW:
 	case POWER_SUPPLY_PROP_TEMP:
 		rc = smblib_get_prop_from_bms(chg, psp, val);
+		break;
+	case POWER_SUPPLY_PROP_CURRENT_NOW:
+		rc = smblib_get_prop_from_bms(chg, psp, val);
+		if (!rc)
+			val->intval *= (-1);
+		break;
+	case POWER_SUPPLY_PROP_FCC_STEPPER_ENABLE:
+		val->intval = chg->fcc_stepper_enable;
 		break;
 #if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	case POWER_SUPPLY_PROP_SMART_CHARGING_ACTIVATION:
@@ -1598,6 +1616,12 @@ static int smb2_batt_set_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX:
 		chg->batt_profile_fcc_ua = val->intval;
 		vote(chg->fcc_votable, BATT_PROFILE_VOTER, true, val->intval);
+		break;
+	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT:
+		if (val->intval)
+			vote(chg->fcc_votable, FG_ESR_VOTER, true, val->intval);
+		else
+			vote(chg->fcc_votable, FG_ESR_VOTER, false, 0);
 		break;
 	case POWER_SUPPLY_PROP_SET_SHIP_MODE:
 		/* Not in ship mode as long as the device is active */
@@ -1928,6 +1952,13 @@ static int smb2_configure_typec(struct smb_charger *chg)
 		return rc;
 	}
 
+	/* Set CC threshold to 1.6 V in source mode */
+	rc = smblib_masked_write(chg, TYPE_C_CFG_2_REG, DFP_CC_1P4V_OR_1P6V_BIT,
+				 DFP_CC_1P4V_OR_1P6V_BIT);
+	if (rc < 0)
+		dev_err(chg->dev,
+			"Couldn't configure CC threshold voltage rc=%d\n", rc);
+
 #if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	/* enable APSD CC trigger */
 	rc = smblib_masked_write(chg, TYPE_C_CFG_REG,
@@ -2145,7 +2176,8 @@ static int smb2_init_hw(struct smb2 *chip)
 			true, 0);
 	vote(chg->pd_disallowed_votable_indirect, HVDCP_TIMEOUT_VOTER,
 			true, 0);
-
+	vote(chg->pd_disallowed_votable_indirect, PD_NOT_SUPPORTED_VOTER,
+			chip->dt.no_pd, 0);
 	/*
 	 * AICL configuration:
 	 * start from min and AICL ADC disable

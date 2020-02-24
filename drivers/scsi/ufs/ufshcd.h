@@ -3,7 +3,7 @@
  *
  * This code is based on drivers/scsi/ufs/ufshcd.h
  * Copyright (C) 2011-2013 Samsung India Software Operations
- * Copyright (c) 2013-2018, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2019, The Linux Foundation. All rights reserved.
  *
  * Authors:
  *	Santosh Yaraganavi <santosh.sy@samsung.com>
@@ -32,11 +32,6 @@
  * circumstances will the contributor of this Program be liable for
  * any damages of any kind arising from your use or distribution of
  * this program.
- */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
  */
 
 #ifndef _UFSHCD_H
@@ -817,6 +812,7 @@ struct ufs_hba {
 	unsigned int irq;
 	bool is_irq_enabled;
 
+	u32 dev_ref_clk_gating_wait;
 	u32 dev_ref_clk_freq;
 
 	/* Interrupt aggregation support is broken */

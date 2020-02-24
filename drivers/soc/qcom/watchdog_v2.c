@@ -9,11 +9,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -894,7 +889,7 @@ static int msm_watchdog_probe(struct platform_device *pdev)
 	md_entry.virt_addr = (uintptr_t)wdog_dd;
 	md_entry.phys_addr = virt_to_phys(wdog_dd);
 	md_entry.size = sizeof(*wdog_dd);
-	if (msm_minidump_add_region(&md_entry))
+	if (msm_minidump_add_region(&md_entry) < 0)
 		pr_info("Failed to add Watchdog data in Minidump\n");
 
 	return 0;

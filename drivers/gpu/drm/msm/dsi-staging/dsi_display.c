@@ -11,11 +11,6 @@
  * GNU General Public License for more details.
  *
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #define pr_fmt(fmt)	"msm-dsi-display:[%s] " fmt, __func__
 
@@ -1071,6 +1066,9 @@ static ssize_t debugfs_dump_info_read(struct file *file,
 			"\tClock master = %s\n",
 			display->ctrl[display->clk_master_idx].ctrl->name);
 
+	if (len > user_len)
+		len = user_len;
+
 	if (copy_to_user(user_buf, buf, len)) {
 		kfree(buf);
 		return -EFAULT;
@@ -1199,7 +1197,7 @@ static ssize_t debugfs_misr_read(struct file *file,
 		goto error;
 	}
 
-	if (copy_to_user(user_buf, buf, len)) {
+	if (copy_to_user(user_buf, buf, max_len)) {
 		rc = -EFAULT;
 		goto error;
 	}
@@ -5297,12 +5295,12 @@ int dsi_display_get_modes(struct dsi_display *display,
 
 	mutex_lock(&display->display_lock);
 
+	if (display->modes)
+		goto exit;
+
 	rc = dsi_display_get_mode_count_no_lock(display, &total_mode_count);
 	if (rc)
 		goto error;
-
-	/* free any previously probed modes */
-	kfree(display->modes);
 
 	display->modes = kcalloc(total_mode_count, sizeof(*display->modes),
 			GFP_KERNEL);
@@ -5382,6 +5380,7 @@ int dsi_display_get_modes(struct dsi_display *display,
 		}
 	}
 
+exit:
 	*out_modes = display->modes;
 	rc = 0;
 

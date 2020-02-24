@@ -9,11 +9,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #ifndef PFK_H_
 #define PFK_H_
@@ -38,7 +33,8 @@ struct blk_encryption_key {
 };
 
 int pfk_load_key_start(const struct bio *bio,
-		struct ice_crypto_setting *ice_setting, bool *is_pfe, bool);
+		struct ice_crypto_setting *ice_setting,
+		bool *is_pfe, bool async, int ice_rev);
 int pfk_load_key_end(const struct bio *bio, bool *is_pfe);
 int pfk_remove_key(const unsigned char *key, size_t key_size);
 bool pfk_allow_merge_bio(const struct bio *bio1, const struct bio *bio2);
@@ -46,7 +42,8 @@ void pfk_clear_on_reset(void);
 
 #else
 static inline int pfk_load_key_start(const struct bio *bio,
-	struct ice_crypto_setting *ice_setting, bool *is_pfe, bool async)
+	struct ice_crypto_setting *ice_setting, bool *is_pfe,
+	bool async, int ice_rev)
 {
 	return -ENODEV;
 }

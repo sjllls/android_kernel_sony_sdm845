@@ -10,11 +10,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #ifndef __WALT_H
 #define __WALT_H
@@ -160,7 +155,7 @@ extern void walt_prepare_migrate(struct task_struct *p,
 					int src_cpu, int new_cpu, bool locked);
 extern void walt_finish_migrate(struct task_struct *p,
 					int src_cpu, int new_cpu, bool locked);
-extern void init_new_task_load(struct task_struct *p, bool idle_task);
+extern void init_new_task_load(struct task_struct *p);
 extern void mark_task_starting(struct task_struct *p);
 extern void set_window_start(struct rq *rq);
 void account_irqtime(int cpu, struct task_struct *curr, u64 delta,
@@ -356,7 +351,7 @@ static inline void walt_prepare_migrate(struct task_struct *p,
 		int src_cpu, int new_cpu, bool locked) { }
 static inline void walt_finish_migrate(struct task_struct *p,
 		int src_cpu, int new_cpu, bool locked) { }
-static inline void init_new_task_load(struct task_struct *p, bool idle_task)
+static inline void init_new_task_load(struct task_struct *p)
 {
 }
 

@@ -19,13 +19,6 @@
  *  GNU General Public License for more details.
  *
  ******************************************************************************/
-/*
- * Copyright (C) 2018 Sony Mobile Communications Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2, as
- * published by the Free Software Foundation.
- */
 /*..+....1....+....2....+....3....+....4....+....5....+....6....+....7....+...*/
 
 /******************************************************************************
@@ -63,6 +56,14 @@
 #define D_TUNER_CONFIG_PLATFORM_DRIVER_NAME "mmtuner_pdev"
 #define D_TUNER_CONFIG_SYSFS_DEV_NAME       "mmtuner_pdev"
 #define D_TUNER_CONFIG_MATCH_TABLE          "socionext,mn88553"
+
+/*
+ * spi buffer size
+ *  tuner max buffer : 695
+ *  Data UnReady Thresh(lower limit) : 1/2
+ *  TS packet size : 188
+ */
+#define D_TUNER_SPI_BUFFER_SIZE            (((695/2) & 0xffc) * 188)
 
 enum gpio_id {
 	TUNER_POWER_PIN = 0,
@@ -503,8 +504,16 @@ static int tuner_probe(struct platform_device *pdev)
 	pr_debug("%s, kthread_create(tuner_drv_tsif_th)-after debug\n",
 		__func__);
 
-	g_tscnt.pktbuf = NULL;
+	/* spi buffer allocate */
 	g_tscnt.spibuf = NULL;
+	pr_debug("%s, spi buffer allocate size[%d]\n",
+		__func__, D_TUNER_SPI_BUFFER_SIZE);
+	g_tscnt.spibuf = kmalloc(D_TUNER_SPI_BUFFER_SIZE, GFP_KERNEL);
+	if (g_tscnt.spibuf == NULL) {
+		pr_err("spi buffer allocation failed.\n");
+	}
+	pr_debug("spi buffer pointer[probe]: %p\n", g_tscnt.spibuf);
+	g_tscnt.pktbuf = NULL;
 	g_tscnt.pwr = g_tscnt.prd = 0;
 	g_tscnt.ovf = 0;
 
@@ -1070,6 +1079,7 @@ static long tuner_module_entry_ioctl(struct file *file,
 #endif
 		}
 		kfree(buf);
+		buf = NULL;
 		return retval;
 	/* read registers continuously */
 	case TUNER_IOCTL_CNTGET:
@@ -1097,6 +1107,7 @@ static long tuner_module_entry_ioctl(struct file *file,
 			}
 		}
 		kfree(buf);
+		buf = NULL;
 		return retval;
 	/* get the interrupt factor and status */
 	case TUNER_IOCTL_EVENT_GET:
@@ -1633,6 +1644,12 @@ static int tuner_drv_tsif_set_cntxt(struct _tsif_cntxt *tc)
 
 	tc->ts_rx_size =
 	tc->ts_rxpkt_num * g_ts_pkt_size[tc->tsif->ts_pkt_type];
+	if (D_TUNER_SPI_BUFFER_SIZE < tc->ts_rx_size) {
+		pr_debug("spi buffer over :%d < %d\n",
+				D_TUNER_SPI_BUFFER_SIZE,
+				(int)tc->ts_rx_size);
+		tc->ts_rx_size = D_TUNER_SPI_BUFFER_SIZE;
+	}
 
 	/* TS buffer size for the TS I/F thread */
 	maxbank = TUNER_MAX_TSPKTBUF_SIZE/tc->ts_rx_size;
@@ -1709,15 +1726,19 @@ static int tuner_drv_tsif_start(void)
 		return ret;
 	}
 
+	pr_debug("spi buffer pointer       : %p\n", g_tscnt.spibuf);
+	if (g_tscnt.spibuf == NULL) {
+		pr_err("memory allocation failed.(spibuf)\n");
+		return -ENOMEM;
+	}
+
 	pr_debug("PKTSIZE:%zu PKTNUM:%zu RXSIZE:%zu BUFSIZE:%zu\n",
 			g_ts_pkt_size[g_tscnt.tsif->ts_pkt_type],
 			g_tscnt.ts_rxpkt_num, g_tscnt.ts_rx_size,
 			g_tscnt.ts_pktbuf_size);
 
 	vfree(g_tscnt.pktbuf);
-	kfree(g_tscnt.spibuf);
 	g_tscnt.pktbuf = NULL;
-	g_tscnt.spibuf = NULL;
 
 #ifdef TUNER_CONFIG_SPI_ALIGN
 	buffer_size = g_tscnt.ts_pktbuf_size + TUNER_CONFIG_SPI_ALIGN - 1;
@@ -1736,12 +1757,6 @@ static int tuner_drv_tsif_start(void)
 		return -ENOMEM;
 	}
 
-	g_tscnt.spibuf = kmalloc(g_tscnt.ts_rx_size, GFP_KERNEL);
-	if (g_tscnt.spibuf == NULL) {
-		vfree(g_tscnt.pktbuf);
-		pr_err("memory allocation failed.(spibuf)\n");
-		return -ENOMEM;
-	}
 	memset(g_tscnt.pktbuf, 0, g_tscnt.ts_pktbuf_size);
 	memset(g_tscnt.spibuf, 0, g_tscnt.ts_rx_size);
 	g_tscnt.pwr = g_tscnt.prd = 0;
@@ -1751,7 +1766,7 @@ static int tuner_drv_tsif_start(void)
 	if (ret) {
 		pr_err("tuner_drv_hw_tsif_config() failed.\n");
 		vfree(g_tscnt.pktbuf);
-		kfree(g_tscnt.spibuf);
+		g_tscnt.pktbuf = NULL;
 		return ret;
 	}
 
@@ -1764,7 +1779,7 @@ static int tuner_drv_tsif_start(void)
 	if (ret) {
 		pr_err("tuner_drv_hw_tsif_sync_pkt failed.\n");
 		vfree(g_tscnt.pktbuf);
-		kfree(g_tscnt.spibuf);
+		g_tscnt.pktbuf = NULL;
 		return ret;
 	}
 
@@ -1839,11 +1854,9 @@ static int tuner_drv_tsif_stop(void)
 	g_tscnt.ts_pktbuf_size = 0;
 
 	vfree(g_tscnt.pktbuf);
-	kfree(g_tscnt.spibuf);
 	kfree(g_tscnt.tsif);
 
 	g_tscnt.pktbuf = NULL;
-	g_tscnt.spibuf = NULL;
 	g_tscnt.tsif = NULL;
 
 	return ret;

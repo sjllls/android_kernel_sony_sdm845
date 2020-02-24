@@ -17,11 +17,6 @@
  * under the terms of the Apache 2.0 License OR version 2 of the GNU
  * General Public License.
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #include "sdcardfs.h"
 #include "linux/ctype.h"
@@ -128,6 +123,12 @@ out:
 	return err;
 }
 
+/* 1 = delete, 0 = cache */
+static int sdcardfs_d_delete(const struct dentry *d)
+{
+	return SDCARDFS_SB(d->d_sb)->options.nocache ? 1 : 0;
+}
+
 static void sdcardfs_d_release(struct dentry *dentry)
 {
 	if (!dentry || !dentry->d_fsdata)
@@ -186,10 +187,10 @@ static void sdcardfs_canonical_path(const struct path *path,
 
 const struct dentry_operations sdcardfs_ci_dops = {
 	.d_revalidate	= sdcardfs_d_revalidate,
+	.d_delete	= sdcardfs_d_delete,
 	.d_release	= sdcardfs_d_release,
 	.d_hash	= sdcardfs_hash_ci,
 	.d_compare	= sdcardfs_cmp_ci,
 	.d_canonical_path = sdcardfs_canonical_path,
-	.d_delete	= always_delete_dentry,
 };
 

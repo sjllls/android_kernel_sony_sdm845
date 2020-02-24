@@ -9,11 +9,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #ifndef _SDE_CONNECTOR_H_
 #define _SDE_CONNECTOR_H_
@@ -334,7 +329,9 @@ struct sde_connector_evt {
  * @bl_scale_dirty: Flag to indicate PP BL scale value(s) is changed
  * @bl_scale: BL scale value for ABA feature
  * @bl_scale_ad: BL scale value for AD feature
- * last_cmd_tx_sts: status of the last command transfer
+ * @unset_bl_level: BL level that needs to be set later
+ * @allow_bl_update: Flag to indicate if BL update is allowed currently or not
+ * @last_cmd_tx_sts: status of the last command transfer
  */
 struct sde_connector {
 	struct drm_connector base;
@@ -378,6 +375,8 @@ struct sde_connector {
 	bool bl_scale_dirty;
 	u32 bl_scale;
 	u32 bl_scale_ad;
+	u32 unset_bl_level;
+	bool allow_bl_update;
 
 	bool last_cmd_tx_sts;
 };

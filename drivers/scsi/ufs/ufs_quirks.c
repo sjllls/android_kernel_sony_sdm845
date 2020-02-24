@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,11 +9,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
  */
 
 #include "ufshcd.h"
@@ -33,6 +28,8 @@ static struct ufs_card_fix ufs_fixups[] = {
 	UFS_FIX(UFS_VENDOR_SKHYNIX, UFS_ANY_MODEL,
 		UFS_DEVICE_QUIRK_HOST_PA_SAVECONFIGTIME),
 	UFS_FIX(UFS_VENDOR_SKHYNIX, UFS_ANY_MODEL, UFS_DEVICE_NO_VCCQ),
+	UFS_FIX(UFS_VENDOR_SKHYNIX, UFS_ANY_MODEL,
+		UFS_DEVICE_QUIRK_WAIT_AFTER_REF_CLK_UNGATE),
 	UFS_FIX(UFS_VENDOR_SKHYNIX, "hB8aL1",
 		UFS_DEVICE_QUIRK_HS_G1_TO_HS_G3_SWITCH),
 	UFS_FIX(UFS_VENDOR_SKHYNIX, "hC8aL1",
@@ -103,9 +100,9 @@ void ufs_advertise_fixup_device(struct ufs_hba *hba)
 
 	dev_info(hba->dev, "%s : vid=%04x, model=%s, spec ver=%04x , "
 		"fw ver=%s\n", __func__, hba->dev_info.w_manufacturer_id,
-		 model, hba->dev_info.specver, revision);
+		 model, hba->dev_info.w_spec_version, revision);
 
-	if (hba->dev_info.specver < UFS_PURGE_SPEC_VER)
+	if (hba->dev_info.w_spec_version < UFS_PURGE_SPEC_VER)
 	    hba->dev_info.quirks |= UFS_DEVICE_QUIRK_NO_PURGE;
 
 	for (f = ufs_fixups; f->quirk; f++) {

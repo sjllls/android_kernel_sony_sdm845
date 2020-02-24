@@ -9,13 +9,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-/*
- * Copyright (C) 2017 Sony Mobile Communications Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2, as
- * published by the Free Software Foundation.
- */
 
 
 &mdss_mdp {
@@ -384,7 +377,6 @@
 		somc,ibb-output-voltage = <5500000>;
 
 		somc,ewu-wait-after-touch-reset = <40>;
-		somc,touch-notifier-call-chain;
 		somc,lk-on-skip;
 
 		qcom,mdss-tear-check-sync-init-val = <3840>;

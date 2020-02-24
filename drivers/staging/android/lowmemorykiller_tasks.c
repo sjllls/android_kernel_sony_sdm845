@@ -7,13 +7,6 @@
  *  it under the terms of the GNU General Public License version 2 as
  *  published by the Free Software Foundation.
  */
-/*
- * Copyright (C) 2018 Sony Mobile Communications Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2, as
- * published by the Free Software Foundation.
- */
 
 /* this files contains help functions for handling tasks within the
  * lowmemorykiller. It track tasks that are in it's score range,
@@ -169,9 +162,21 @@ static void lmk_task_watch(struct task_struct *tsk, int old_oom_score_adj)
 	    !(tsk->flags & PF_KTHREAD)) {
 		spin_lock(&lmk_task_lock);
 		__lmk_task_remove(tsk, old_oom_score_adj);
-		if (tsk->signal->oom_score_adj >= LMK_SCORE_THRESHOLD)
-			if (!test_tsk_thread_flag(tsk, TIF_MEMDIE))
-				__lmk_task_insert(tsk);
+		if (tsk->signal->oom_score_adj >= LMK_SCORE_THRESHOLD) {
+			struct mm_struct *mm = tsk->mm;
+
+			if (mm) {
+				if (!test_tsk_thread_flag(tsk, TIF_MEMDIE) &&
+				    !test_bit(MMF_OOM_SKIP, &mm->flags) &&
+				    !test_bit(MMF_OOM_VICTIM, &mm->flags))
+					__lmk_task_insert(tsk);
+			} else {
+				if (!test_tsk_thread_flag(tsk, TIF_MEMDIE) &&
+				    !test_tsk_thread_flag(tsk, TIF_MM_RELEASED) &&
+				    !task_lmk_waiting(tsk))
+					__lmk_task_insert(tsk);
+			}
+		}
 		spin_unlock(&lmk_task_lock);
 	}
 }

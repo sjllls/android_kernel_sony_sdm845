@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,11 +9,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
  */
 
 #ifndef __SUBSYS_RESTART_H
@@ -41,6 +36,30 @@ enum crash_status {
 
 struct device;
 struct module;
+
+enum ssr_comm {
+	SUBSYS_TO_SUBSYS_SYSMON,
+	SUBSYS_TO_HLOS,
+	HLOS_TO_SUBSYS_SYSMON_SHUTDOWN,
+	NUM_SSR_COMMS,
+};
+
+/**
+ * struct subsys_notif_timeout - timeout data used by notification timeout hdlr
+ * @comm_type: Specifies if the type of communication being tracked is
+ * through sysmon between two subsystems, subsystem notifier call chain, or
+ * sysmon shutdown.
+ * @dest_name: subsystem to which sysmon notification is being sent to
+ * @source_name: subsystem which generated event that notification is being sent
+ * for
+ * @timer: timer for scheduling timeout
+ */
+struct subsys_notif_timeout {
+	enum ssr_comm comm_type;
+	const char *dest_name;
+	const char *source_name;
+	struct timer_list timer;
+};
 
 /**
  * struct subsys_desc - subsystem descriptor
@@ -104,6 +123,9 @@ struct subsys_desc {
 	bool system_debug;
 	bool ignore_ssr_failure;
 	const char *edge;
+#ifdef CONFIG_SETUP_SSR_NOTIF_TIMEOUTS
+	struct subsys_notif_timeout timeout_data;
+#endif /* CONFIG_SETUP_SSR_NOTIF_TIMEOUTS */
 };
 
 /**

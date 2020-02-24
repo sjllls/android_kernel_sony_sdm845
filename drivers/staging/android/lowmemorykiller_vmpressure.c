@@ -7,13 +7,6 @@
  *  it under the terms of the GNU General Public License version 2 as
  *  published by the Free Software Foundation.
  */
-/*
- * Copyright (C) 2018 Sony Mobile Communications Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2, as
- * published by the Free Software Foundation.
- */
 
 /* todo: Handle vmpressure notifier directly.
  * It is there on this version since it us hooking
@@ -29,22 +22,40 @@
 #include <linux/slab.h>
 #include <linux/vmpressure.h>
 
+#include <trace/events/lmk.h>
+
 #include "lowmemorykiller.h"
 #include "lowmemorykiller_tng.h"
 #include "lowmemorykiller_stats.h"
 #include "lowmemorykiller_tasks.h"
 
-void balance_cache(void)
+static unsigned long oldvmp;
+
+void balance_cache(unsigned long vmpressure)
 {
 	struct task_struct *selected = NULL;
 	struct lmk_rb_watch *lrw;
 	int do_kill;
 	struct calculated_params cp;
 	gfp_t mask = ___GFP_KSWAPD_RECLAIM |
-	  ___GFP_DIRECT_RECLAIM | __GFP_FS | __GFP_IO;
+	  ___GFP_DIRECT_RECLAIM | __GFP_FS | __GFP_IO | __GFP_ATOMIC;
 
+	mask &= ~__GFP_MOVABLE;
+
+	if (vmpressure < 50) {
+		oldvmp = vmpressure;
+		return;
+	}
+
+	if (vmpressure < oldvmp && vmpressure < 95) {
+		oldvmp = vmpressure;
+		return;
+	}
+
+	oldvmp = vmpressure;
 	cp.selected_tasksize = 0;
 	cp.dynamic_max_queue_len = 1;
+	cp.kill_reason = LMK_VMPRESSURE;
 	spin_lock_bh(&lmk_task_lock);
 
 	lrw = __lmk_task_first();
@@ -91,6 +102,17 @@ void balance_cache(void)
 
 			/* move to kill pending set */
 			ldpt = kmem_cache_alloc(lmk_dp_cache, GFP_ATOMIC);
+			if (!ldpt) {
+				WARN_ON(1);
+				lmk_inc_stats(LMK_MEM_ERROR);
+				cp.selected_tasksize = SHRINK_STOP;
+				trace_lmk_sigkill(selected->pid, selected->comm,
+						  LMK_TRACE_MEMERROR,
+						  cp.selected_tasksize,
+						  0);
+				goto unlock_out;
+			}
+
 			ldpt->tsk = selected;
 
 			__lmk_death_pending_add(ldpt);
@@ -102,6 +124,11 @@ void balance_cache(void)
 			send_sig(SIGKILL, selected, 0);
 			LMK_TAG_TASK_DIE(selected);
 			print_obituary(selected, &cp, 0);
+			trace_lmk_sigkill(selected->pid, selected->comm,
+					  cp.selected_oom_score_adj,
+					  cp.selected_tasksize,
+					  0);
+
 			task_unlock(selected);
 
 			lmk_inc_stats(LMK_BALANCE_KILL);

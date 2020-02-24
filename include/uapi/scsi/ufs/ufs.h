@@ -1,8 +1,3 @@
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 #ifndef UAPI_UFS_H_
 #define UAPI_UFS_H_
 
@@ -42,7 +37,11 @@ enum attr_idn {
 	QUERY_ATTR_IDN_CNTX_CONF		= 0x10,
 	QUERY_ATTR_IDN_CORR_PRG_BLK_NUM		= 0x11,
 	QUERY_ATTR_IDN_FFU_STATUS		= 0x14,
+	QUERY_ATTR_IDN_REF_CLK_GATING_WAIT_TIME	= 0x17,
 };
+
+#define QUERY_ATTR_IDN_REF_CLK_GATING_WAIT_TIME \
+				QUERY_ATTR_IDN_REF_CLK_GATING_WAIT_TIME
 
 #define QUERY_ATTR_IDN_BOOT_LU_EN_MAX	0x02
 

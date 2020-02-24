@@ -9,13 +9,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-/*
- * Copyright (C) 2017 Sony Mobile Communications Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2, as
- * published by the Free Software Foundation.
- */
 
 &pmi8998_charger {
 	qcom,fv-max-uv = <4380000>;
@@ -45,11 +38,6 @@
 	somc,high-voltage-icl-ua = <1700000>;
 	somc,batt-temp-correction = <0>;
 	somc,skin-temp-correction = <20>;
-};
-
-&pmi8998_pdphy {
-	qcom,default-sink-caps = <5000 2000>, /* 5V @ 2A */
-				 <9000 1700>; /* 9V @ 1.7A */
 };
 
 &vendor {

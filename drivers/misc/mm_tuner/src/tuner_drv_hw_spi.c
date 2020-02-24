@@ -19,13 +19,6 @@
  *  GNU General Public License for more details.
  *
  ******************************************************************************/
-/*
- * Copyright (C) 2018 Sony Mobile Communications Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2, as
- * published by the Free Software Foundation.
- */
 /*..+....1....+....2....+....3....+....4....+....5....+....6....+....7....+...*/
 /******************************************************************************
  * include

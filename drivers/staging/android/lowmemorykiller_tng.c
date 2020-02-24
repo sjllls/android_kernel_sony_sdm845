@@ -9,13 +9,6 @@
  *  it under the terms of the GNU General Public License version 2 as
  *  published by the Free Software Foundation.
  */
-/*
- * Copyright (C) 2018 Sony Mobile Communications Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2, as
- * published by the Free Software Foundation.
- */
 /* This file contain the logic for new lowmemorykiller (TNG). Parts
  * of the calculations is taken from the original lowmemorykiller
  */
@@ -39,8 +32,8 @@
 /*zcache.h has incorrect definition here.*/
 static inline u64 zcache_pages(void) { return 0; }
 #endif
-#define LMK_ZOMBIE_SIZE (4096)
-
+#define LMK_ZOMBIE_SIZE (PAGE_SIZE)
+static int seek_count;
 static unsigned long lowmem_count_tng(struct shrinker *s,
 				      struct shrink_control *sc);
 static unsigned long lowmem_scan_tng(struct shrinker *s,
@@ -63,34 +56,166 @@ ssize_t get_task_rss(struct task_struct *tsk)
 
 	mm = ACCESS_ONCE(tsk->mm);
 	if (mm)
-		rss = get_mm_rss(mm);
+		rss = get_mm_rss(mm) << PAGE_SHIFT;
 	if (rss < LMK_ZOMBIE_SIZE)
 		rss = LMK_ZOMBIE_SIZE;
 	return rss;
+}
+
+static inline long zone_threshold_check(struct zone *zone, int zone_type,
+					int threshold)
+{
+	int order;
+	unsigned long flags;
+	unsigned long tot = 0;
+
+	spin_lock_irqsave(&zone->lock, flags);
+	for (order = 0; order < MAX_ORDER; ++order) {
+		struct free_area *area;
+		struct list_head *curr;
+
+		area = &zone->free_area[order];
+		list_for_each(curr, &area->free_list[zone_type]) {
+			tot += 1 << order;
+			if (tot >= threshold)
+				goto out;
+		}
+	}
+out:
+	spin_unlock_irqrestore(&zone->lock, flags);
+	return tot;
+}
+
+/* can_swap check if we have memory resources to be able to swap.
+ * When we have a pressure to get more atomic or movable pages
+ * it is sent through the shrinker as gfp. We can not trace it back
+ * to who the consumer is.
+ */
+static int can_swap(gfp_t mask, int atomic_threshold, int movable_threshold)
+{
+	struct zonelist *zonelist;
+	enum zone_type high_zoneidx;
+	struct zone *zone;
+	struct zoneref *zoneref;
+	int zone_idx;
+	struct zone *preferred_zone;
+	struct zoneref *zref;
+	int sum_atomic = 0;
+	int sum_movable = 0;
+
+	/* if there is no need for movable or atomic we are safe */
+
+	if (atomic_threshold == 0 && movable_threshold == 0)
+		return 1;
+
+	zonelist = node_zonelist(0, 0);
+
+	high_zoneidx = gfp_zone(mask);
+	zref = first_zones_zonelist(zonelist, high_zoneidx, NULL);
+	preferred_zone = zref->zone;
+
+	/* Watermark for the zone can handle 64 pages of order 0
+	 * we assume we are safe.
+	 */
+	if (zone_watermark_ok(preferred_zone, 0, 64, high_zoneidx, mask))
+		return 1;
+
+	/* this is scan is heuristic based on qualcomm hardware. */
+	/* we can swap if there is movable pages */
+	for_each_zone_zonelist(zone, zoneref, zonelist, MAX_NR_ZONES) {
+		zone_idx = zonelist_zone_idx(zoneref);
+		if (movable_threshold) {
+			sum_movable += zone_threshold_check(zone,
+							    MIGRATE_CMA,
+							    movable_threshold);
+			if (sum_movable >= movable_threshold &&
+			    sum_atomic >= atomic_threshold)
+				return 1;
+		}
+
+		if (zone_idx == ZONE_NORMAL) {
+			sum_atomic +=
+				zone_threshold_check(zone,
+						     MIGRATE_HIGHATOMIC,
+						     atomic_threshold);
+
+			if (sum_movable >= movable_threshold &&
+			    sum_atomic >= atomic_threshold)
+				return 1;
+
+			sum_movable +=
+				zone_threshold_check(zone,
+						     MIGRATE_MOVABLE,
+						     movable_threshold);
+
+			if (sum_movable >= movable_threshold &&
+			    sum_atomic >= atomic_threshold)
+				return 1;
+		}
+	}
+	return 0;
 }
 
 static void calc_params(struct calculated_params *cp, gfp_t mask)
 {
 	int i;
 	int array_size;
+	long free_swap = get_nr_swap_pages();
+	long irp = global_node_page_state(NR_INDIRECTLY_RECLAIMABLE_BYTES)
+	  >> PAGE_SHIFT;
+	long usable_free_swap = 0;
+	long tot_usable = 0;
+	int start;
+	int cs = 1; /* we can swap unless the checks says no */
+	int movc = 0;
+	int atomicc = 0;
 
-	cp->other_free = global_page_state(NR_FREE_PAGES) - totalreserve_pages;
+	if (free_swap > 64) {
+		if (mask & __GFP_MOVABLE)
+			movc = (1 << (PAGE_ALLOC_COSTLY_ORDER + 2));
+
+		if (mask & __GFP_ATOMIC)
+			atomicc = (1 << PAGE_ALLOC_COSTLY_ORDER);
+
+		cs = can_swap(mask, atomicc, movc);
+		if (cs) {
+			if (free_swap > 0x800)
+				usable_free_swap = free_swap;
+			else
+				usable_free_swap = free_swap / 2;
+
+		} else {
+			cp->kill_reason |= LMK_CANT_SWAP;
+		}
+	}
+
+	/* NOTE! NR_FREE_CMA_PAGES is also part of NR_FREE_PAGES,
+	 * so there is a double accounting.
+	 */
+	tot_usable = usable_free_swap + irp
+	  + global_page_state(NR_FREE_CMA_PAGES);
+	cp->margin = global_page_state(NR_FREE_PAGES) - totalreserve_pages;
+	cp->other_free = cp->margin + tot_usable;
 
 	if (global_node_page_state(NR_SHMEM) + total_swapcache_pages() +
-			global_node_page_state(NR_UNEVICTABLE) <
-			global_node_page_state(NR_FILE_PAGES))
+		global_node_page_state(NR_UNEVICTABLE) <
+		global_node_page_state(NR_FILE_PAGES))
 		cp->other_file = global_node_page_state(NR_FILE_PAGES) -
-					global_node_page_state(NR_SHMEM) -
-					global_node_page_state(NR_UNEVICTABLE) -
-					total_swapcache_pages();
+			global_node_page_state(NR_SHMEM) -
+			global_node_page_state(NR_UNEVICTABLE) -
+			total_swapcache_pages();
 	else
 		cp->other_file = 0;
 
-	cp->minfree = 0;
 	cp->min_score_adj = SHRT_MAX;
-	tune_lmk_param_mask(&cp->other_free, &cp->other_file, mask);
 	array_size = lowmem_min_param_size();
-	for (i = 0; i < array_size; i++) {
+	start = 0;
+
+	/* be extra careful with vmpressure to kill perceptible stuff */
+	if (tot_usable > 128 && cp->kill_reason == LMK_VMPRESSURE)
+		start = 3;
+
+	for (i = start; i < array_size; i++) {
 		cp->minfree = lowmem_minfree[i];
 		if (cp->other_free < cp->minfree &&
 		    cp->other_file < cp->minfree) {
@@ -98,8 +223,28 @@ static void calc_params(struct calculated_params *cp, gfp_t mask)
 			break;
 		}
 	}
-	adjust_minadj(&cp->min_score_adj);
-	cp->dynamic_max_queue_len = array_size - i + 1;
+	cp->dynamic_max_queue_len = (array_size - i) / 2 + 1;
+
+	/* If there is a lot of reclaimable we dont kill more
+	 *  than one at the time.
+	 */
+	if (tot_usable > 128)
+		cp->dynamic_max_queue_len = 1;
+
+	if (cp->margin <= 0) {
+		/* If have used more 5/6 our total reserve
+		 * we need to take a action and kill something even if
+		 * we have reclaimable memory and lot of free swap
+		 * but can not swap.
+		 */
+		if (cp->kill_reason & LMK_CANT_SWAP) {
+			if (-6 * (cp->margin) > 5 * totalreserve_pages) {
+				cp->kill_reason |= LMK_LOW_RESERVE;
+				cp->dynamic_max_queue_len = 1;
+				cp->min_score_adj = 0;
+			}
+		}
+	}
 }
 
 int kill_needed(int level, gfp_t mask,
@@ -132,10 +277,12 @@ void print_obituary(struct task_struct *doomed,
 		     "   Slab UnReclaimable is %ldkB\n"
 		     "   Total Slab is %ldkB\n"
 		     "   GFP mask is 0x%x\n"
-		     "   queue len is %d of max %d\n",
+		     "   Indirect Reclaimable is %zdkB\n"
+		     "   Free Swap %ldkB\n"
+		     "   queue len is %d of max %d reason:0x%x margin:%d\n",
 		     doomed->comm, doomed->pid,
 		     cp->selected_oom_score_adj,
-		     cp->selected_tasksize * (long)(PAGE_SIZE / 1024),
+		     cp->selected_tasksize / 1024,
 		     current->comm, current->pid,
 		     cache_size, cache_limit,
 		     cp->min_score_adj,
@@ -156,8 +303,12 @@ void print_obituary(struct task_struct *doomed,
 		     global_page_state(NR_SLAB_UNRECLAIMABLE) *
 		     (long)(PAGE_SIZE / 1024),
 		     gfp_mask,
+		     global_node_page_state(NR_INDIRECTLY_RECLAIMABLE_BYTES)
+		     / 1024,
+		     get_nr_swap_pages() * (long)(PAGE_SIZE / 1024),
 		     death_pending_len,
-		     cp->dynamic_max_queue_len);
+		     cp->dynamic_max_queue_len,
+		     cp->kill_reason, cp->margin);
 }
 
 static unsigned long lowmem_count_tng(struct shrinker *s,
@@ -167,14 +318,21 @@ static unsigned long lowmem_count_tng(struct shrinker *s,
 	struct calculated_params cp;
 	short score;
 
-	if (current_is_kswapd())
-		return 0;
+	if (!(sc->gfp_mask & __GFP_MOVABLE)) {
+		if (current_is_kswapd()) {
+			if (seek_count++ < (s->seeks * 4))
+				return 0;
+			seek_count = 0;
+		}
+	}
+
 	lmk_inc_stats(LMK_COUNT);
 	cp.selected_tasksize = 0;
+	cp.kill_reason = LMK_SHRINKER_COUNT;
 	spin_lock(&lmk_task_lock);
 	lrw = __lmk_task_first();
 	if (lrw) {
-		int rss = get_task_rss(lrw->tsk);
+		ssize_t rss = get_task_rss(lrw->tsk);
 
 		score = lrw->tsk->signal->oom_score_adj;
 		spin_unlock(&lmk_task_lock);
@@ -208,6 +366,7 @@ static unsigned long lowmem_scan_tng(struct shrinker *s,
 	lmk_inc_stats(LMK_SCAN);
 
 	cp.selected_tasksize = 0;
+	cp.kill_reason = LMK_SHRINKER_SCAN;
 	spin_lock(&lmk_task_lock);
 
 	lrw = __lmk_task_first();
@@ -239,6 +398,17 @@ static unsigned long lowmem_scan_tng(struct shrinker *s,
 
 			/* move to kill pending set */
 			ldpt = kmem_cache_alloc(lmk_dp_cache, GFP_ATOMIC);
+			if (!ldpt) {
+				WARN_ON(1);
+				lmk_inc_stats(LMK_MEM_ERROR);
+				cp.selected_tasksize = SHRINK_STOP;
+				trace_lmk_sigkill(selected->pid, selected->comm,
+						  LMK_TRACE_MEMERROR,
+						  cp.selected_tasksize,
+						  sc->gfp_mask);
+
+				goto unlock_out;
+			}
 			ldpt->tsk = selected;
 
 			__lmk_death_pending_add(ldpt);

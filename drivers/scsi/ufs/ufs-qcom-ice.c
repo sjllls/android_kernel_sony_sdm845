@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2018, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,11 +9,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
  */
 
 #include <linux/io.h>
@@ -231,14 +226,17 @@ int ufs_qcom_ice_init(struct ufs_qcom_host *qcom_host)
 	}
 
 	qcom_host->dbg_print_en |= UFS_QCOM_ICE_DEFAULT_DBG_PRINT_EN;
-	ice_workqueue = alloc_workqueue("ice-set-key",
-			WQ_MEM_RECLAIM | WQ_HIGHPRI, 0);
 	if (!ice_workqueue) {
-		dev_err(ufs_dev, "%s: workqueue allocation failed.\n",
+		ice_workqueue = alloc_workqueue("ice-set-key",
+			WQ_MEM_RECLAIM | WQ_HIGHPRI, 0);
+		if (!ice_workqueue) {
+			dev_err(ufs_dev, "%s: workqueue allocation failed.\n",
 			__func__);
-		goto out;
+			err = -ENOMEM;
+			goto out;
+		}
+		INIT_WORK(&qcom_host->ice_cfg_work, ufs_qcom_ice_cfg_work);
 	}
-	INIT_WORK(&qcom_host->ice_cfg_work, ufs_qcom_ice_cfg_work);
 
 out:
 	return err;
@@ -291,6 +289,17 @@ int ufs_qcom_ice_req_setup(struct ufs_qcom_host *qcom_host,
 			 * propagate so it will be re-queued.
 			 */
 			if (err == -EAGAIN) {
+				if (!ice_workqueue) {
+					spin_unlock_irqrestore(
+					&qcom_host->ice_work_lock,
+					flags);
+
+					dev_err(qcom_host->hba->dev,
+						"%s: error %d workqueue NULL\n",
+						__func__, err);
+					return -EINVAL;
+				}
+
 				dev_dbg(qcom_host->hba->dev,
 					"%s: scheduling task for ice setup\n",
 					__func__);
@@ -410,6 +419,16 @@ int ufs_qcom_ice_cfg_start(struct ufs_qcom_host *qcom_host,
 			 * propagate so it will be re-queued.
 			 */
 			if (err == -EAGAIN) {
+				if (!ice_workqueue) {
+					spin_unlock_irqrestore(
+					&qcom_host->ice_work_lock,
+					flags);
+
+					dev_err(qcom_host->hba->dev,
+						"%s: error %d workqueue NULL\n",
+						__func__, err);
+					return -EINVAL;
+				}
 
 				dev_dbg(qcom_host->hba->dev,
 					"%s: scheduling task for ice setup\n",

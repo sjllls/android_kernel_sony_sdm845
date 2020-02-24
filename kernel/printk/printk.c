@@ -15,11 +15,6 @@
  * Rewrote bits to get rid of console_lock
  *	01Mar01 Andrew Morton
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #include <linux/kernel.h>
 #include <linux/mm.h>
@@ -1019,7 +1014,12 @@ static void __init log_buf_len_update(unsigned size)
 /* save requested log_buf_len since it's too early to process it */
 static int __init log_buf_len_setup(char *str)
 {
-	unsigned size = memparse(str, &str);
+	unsigned int size;
+
+	if (!str)
+		return -EINVAL;
+
+	size = memparse(str, &str);
 
 	log_buf_len_update(size);
 

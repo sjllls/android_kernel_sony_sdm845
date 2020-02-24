@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2008-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -289,6 +289,7 @@ struct lcd_panel_info {
 	u32 h_pulse_width;
 	u32 v_back_porch;
 	u32 v_front_porch;
+	u32 v_front_porch_fixed;
 	u32 v_pulse_width;
 	u32 border_clr;
 	u32 underflow_clr;
@@ -689,6 +690,8 @@ struct mdss_panel_info {
 	bool esd_rdy;
 	bool partial_update_supported; /* value from dts if pu is supported */
 	bool partial_update_enabled; /* is pu currently allowed */
+	u32 partial_update_col_addr_offset; /* panel column addr offset */
+	u32 partial_update_row_addr_offset; /* panel row addr offset */
 	u32 dcs_cmd_by_left;
 	u32 partial_update_roi_merge;
 	struct ion_handle *splash_ihdl;
@@ -924,6 +927,23 @@ end:
 	}
 
 	return frame_rate;
+}
+
+/*
+ * mdss_panel_get_vtotal_fixed() - return panel device tree vertical height
+ * @pinfo:	Pointer to panel info containing all panel information
+ *
+ * Returns the total height as defined in panel device tree including any
+ * blanking regions which are not visible to user but used to calculate
+ * panel clock.
+ */
+static inline int mdss_panel_get_vtotal_fixed(struct mdss_panel_info *pinfo)
+{
+	return pinfo->yres + pinfo->lcdc.v_back_porch +
+			pinfo->lcdc.v_front_porch_fixed +
+			pinfo->lcdc.v_pulse_width+
+			pinfo->lcdc.border_top +
+			pinfo->lcdc.border_bottom;
 }
 
 /*

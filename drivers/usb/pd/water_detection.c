@@ -1,11 +1,4 @@
 /* this definition is enabled if use alarm timer. */
-/*
- * Copyright (C) 2017 Sony Mobile Communications Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2, as
- * published by the Free Software Foundation.
- */
 /*#define USE_ALARM*/
 /* this definition is enabled if use LCD linkage. */
 #define USE_LCDSTATE
@@ -28,7 +21,7 @@
 #include <linux/drm_notify.h>
 #include "water_detection.h"
 
-#define WDET_CONNECT_CHECK_DELAY	300	/*ms*/
+#define WDET_CONNECT_CHECK_DELAY	500	/*ms*/
 #define WDET_NEGOTIATION_CHECK_DELAY	2000	/*ms*/
 
 #define WDET_WATER_CHECK_SHORT_TIMER	7	/*sec*/

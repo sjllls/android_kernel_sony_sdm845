@@ -7,11 +7,6 @@
  * storage pool implementations.  Typically, this is used to
  * store compressed memory.
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #ifndef _ZPOOL_H_
 #define _ZPOOL_H_
@@ -63,12 +58,13 @@ void *zpool_map_handle(struct zpool *pool, unsigned long handle,
 
 void zpool_unmap_handle(struct zpool *pool, unsigned long handle);
 
-u64 zpool_get_total_size(struct zpool *pool);
-
 unsigned long zpool_compact(struct zpool *pool);
 
-unsigned long zpool_get_num_compacted(struct zpool *zpool);
+unsigned long zpool_get_num_compacted(struct zpool *pool);
 
+u64 zpool_get_total_size(struct zpool *pool);
+
+size_t zpool_huge_class_size(struct zpool *zpool);
 /**
  * struct zpool_driver - driver implementation for zpool
  * @type:	name of the driver.
@@ -80,7 +76,10 @@ unsigned long zpool_get_num_compacted(struct zpool *zpool);
  * @shrink:	shrink the pool.
  * @map:	map a handle.
  * @unmap:	unmap a handle.
+ * @compact:	try to run compaction over a pool
+ * @get_num_compacted:	get amount of compacted pages for a pool
  * @total_size:	get total size of a pool.
+ * @huge_class_size: huge class threshold for pool pages
  *
  * This is created by a zpool implementation and registered
  * with zpool.
@@ -108,11 +107,11 @@ struct zpool_driver {
 				enum zpool_mapmode mm);
 	void (*unmap)(void *pool, unsigned long handle);
 
-	u64 (*total_size)(void *pool);
-
 	unsigned long (*compact)(void *pool);
-
 	unsigned long (*get_num_compacted)(void *pool);
+
+	u64 (*total_size)(void *pool);
+	size_t (*huge_class_size)(void *pool);
 };
 
 void zpool_register_driver(struct zpool_driver *driver);

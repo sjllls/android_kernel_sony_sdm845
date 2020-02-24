@@ -3,11 +3,6 @@
  * Only quirks that affect the whole device, not an interface,
  * belong here.
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #ifndef __LINUX_USB_QUIRKS_H
 #define __LINUX_USB_QUIRKS_H

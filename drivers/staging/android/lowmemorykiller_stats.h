@@ -7,13 +7,6 @@
  *  it under the terms of the GNU General Public License version 2 as
  *  published by the Free Software Foundation.
  */
-/*
- * Copyright (C) 2018 Sony Mobile Communications Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2, as
- * published by the Free Software Foundation.
- */
 
 #ifndef __LOWMEMORYKILLER_STATS_H
 #define __LOWMEMORYKILLER_STATS_H
@@ -34,6 +27,7 @@ enum  lmk_kill_stats {
 	LMK_BALANCE_KILL = 13,
 	LMK_BALANCE_WASTE = 14,
 	LMK_MORGUE_COUNT = 15,
+	LMK_MEM_ERROR = 16,
 };
 
 #define LMK_PROCFS_NAME "lmkstats"

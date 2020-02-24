@@ -10,11 +10,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #include <dt-bindings/clock/qcom,gcc-sdm845.h>
 #include <dt-bindings/msm/msm-bus-ids.h>
@@ -145,7 +140,9 @@
 			 0x198 /* PLL_BIAS_CONTROL_2 */
 			 0x228 /* QUSB2PHY_SQ_CTRL1 */
 			 0x22c /* QUSB2PHY_SQ_CTRL2 */
-			 0x27c>; /* QUSB2PHY_DEBUG_CTRL1 */
+			 0x27c /* QUSB2PHY_DEBUG_CTRL1 */
+			 0x280 /* QUSB2PHY_DEBUG_CTRL2 */
+			 0x2a0>; /* QUSB2PHY_STAT5 */
 
 		qcom,qusb-phy-init-seq =
 			/* <value reg_offset> */
@@ -434,7 +431,9 @@
 			 0x198 /* PLL_BIAS_CONTROL_2 */
 			 0x228 /* QUSB2PHY_SQ_CTRL1 */
 			 0x22c /* QUSB2PHY_SQ_CTRL2 */
-			 0x27c>; /* QUSB2PHY_DEBUG_CTRL1 */
+			 0x27c /* QUSB2PHY_DEBUG_CTRL1 */
+			 0x280 /* QUSB2PHY_DEBUG_CTRL2 */
+			 0x2a0>; /* QUSB2PHY_STAT5 */
 
 		qcom,qusb-phy-init-seq =
 			/* <value reg_offset> */

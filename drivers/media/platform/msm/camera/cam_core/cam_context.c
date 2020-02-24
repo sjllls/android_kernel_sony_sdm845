@@ -9,11 +9,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #include <linux/slab.h>
 #include <linux/uaccess.h>
@@ -300,28 +295,28 @@ int cam_context_handle_release_dev(struct cam_context *ctx,
 		req = list_first_entry(&ctx->active_req_list,
 				struct cam_ctx_request, list);
 		list_del_init(&req->list);
-		numReq ++;
+		numReq++;
 	}
 
 	while (!list_empty(&ctx->wait_req_list)) {
 		req = list_first_entry(&ctx->wait_req_list,
 				struct cam_ctx_request, list);
 		list_del_init(&req->list);
-		numReq ++;
+		numReq++;
 	}
 
 	while (!list_empty(&ctx->pending_req_list)) {
 		req = list_first_entry(&ctx->pending_req_list,
 				struct cam_ctx_request, list);
 		list_del_init(&req->list);
-		numReq ++;
+		numReq++;
 	}
 
 	while (!list_empty(&ctx->free_req_list)) {
 		req = list_first_entry(&ctx->free_req_list,
 				struct cam_ctx_request, list);
 		list_del_init(&req->list);
-		numReq ++;
+		numReq++;
 	}
 
 	for (i = 0; i < ctx->req_size; i++) {

@@ -55,8 +55,6 @@ config ANDROID_LOW_MEMORY_KILLER_STATS
 	  will be different depending on lmk implementation used
 	  in TNG lowmemorykiller.
 
-
-
 config ANDROID_VSOC
 	tristate "Android Virtual SoC support"
 	default n

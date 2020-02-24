@@ -9,13 +9,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-/*
- * Copyright (C) 2017 Sony Mobile Communications Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2, as
- * published by the Free Software Foundation.
- */
 
 / {
 	reserved-memory {
@@ -615,6 +608,7 @@
 };
 
 &pmi8998_charger {
+	qcom,otg-cl-ua = <1000000>;
 	smb2_vbus: qcom,smb2-vbus {
 		regulator-name = "smb2-vbus";
 	};

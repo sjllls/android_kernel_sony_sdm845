@@ -1,8 +1,3 @@
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 #include <linux/configfs.h>
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -339,6 +334,7 @@ static ssize_t gadget_dev_desc_UDC_store(struct config_item *item,
 			gi->composite.gadget_driver.udc_name = NULL;
 			goto err;
 		}
+		schedule_work(&gi->work);
 	}
 	mutex_unlock(&gi->lock);
 	return len;

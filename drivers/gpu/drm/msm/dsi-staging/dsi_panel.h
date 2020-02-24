@@ -11,11 +11,6 @@
  * GNU General Public License for more details.
  *
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #ifndef _DSI_PANEL_H_
 #define _DSI_PANEL_H_
@@ -64,6 +59,11 @@ enum dsi_backlight_type {
 	DSI_BACKLIGHT_MAX,
 };
 
+enum bl_update_flag {
+	BL_UPDATE_DELAY_UNTIL_FIRST_FRAME,
+	BL_UPDATE_NONE,
+};
+
 enum {
 	MODE_GPIO_NOT_VALID = 0,
 	MODE_SEL_DUAL_PORT,
@@ -102,6 +102,7 @@ struct dsi_panel_phy_props {
 
 struct dsi_backlight_config {
 	enum dsi_backlight_type type;
+	enum bl_update_flag bl_update;
 
 	u32 bl_min_level;
 	u32 bl_max_level;

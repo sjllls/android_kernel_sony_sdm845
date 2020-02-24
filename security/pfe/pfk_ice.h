@@ -9,11 +9,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #ifndef PFK_ICE_H_
 #define PFK_ICE_H_
@@ -31,7 +26,8 @@ int pfk_ice_init(void);
 int pfk_ice_deinit(void);
 
 int qti_pfk_ice_set_key(uint32_t index, uint8_t *key, uint8_t *salt,
-			char *storage_type);
+			char *storage_type, unsigned int data_unit,
+			int ice_rev);
 int qti_pfk_ice_invalidate_key(uint32_t index, char *storage_type);
 
 

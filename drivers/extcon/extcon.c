@@ -23,11 +23,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #include <linux/module.h>
 #include <linux/types.h>
@@ -492,7 +487,7 @@ int extcon_sync(struct extcon_dev *edev, unsigned int id)
 }
 EXPORT_SYMBOL_GPL(extcon_sync);
 
-int extcon_blocking_sync(struct extcon_dev *edev, unsigned int id, bool val)
+int extcon_blocking_sync(struct extcon_dev *edev, unsigned int id, u8 val)
 {
 	int index;
 

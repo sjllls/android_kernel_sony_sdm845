@@ -80,6 +80,8 @@ OBJCOPYFLAGS_lkdtm_rodata_objcopy.o := \
 targets += lkdtm_rodata.o lkdtm_rodata_objcopy.o
 $(obj)/lkdtm_rodata_objcopy.o: $(obj)/lkdtm_rodata.o FORCE
 	$(call if_changed,objcopy)
+
+obj-$(CONFIG_OKL4_LINK_SHBUF)    += okl4-link-shbuf.o
 obj-$(CONFIG_RAMDUMP_TAGS) += rdtags.o
 obj-$(CONFIG_RAMDUMP_MEMDESC) += ramdump_mem_desc.o
 obj-$(CONFIG_POWERKEY_FORCECRASH) += powerkey_forcecrash.o

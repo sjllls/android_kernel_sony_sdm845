@@ -9,11 +9,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #include <linux/module.h>
 #include <linux/types.h>
@@ -98,11 +93,17 @@ int cam_mem_mgr_init(void)
 	}
 
 	bitmap_size = BITS_TO_LONGS(CAM_MEM_BUFQ_MAX) * sizeof(long);
-	tbl.bitmap = kzalloc(bitmap_size, GFP_KERNEL);
+/* sony extension begin */
 	if (!tbl.bitmap) {
-		rc = -ENOMEM;
-		goto bitmap_fail;
+/* sony extension end */
+		tbl.bitmap = kzalloc(bitmap_size, GFP_KERNEL);
+		if (!tbl.bitmap) {
+			rc = -ENOMEM;
+			goto bitmap_fail;
+		}
+/* sony extension begin */
 	}
+/* sony extension end */
 	tbl.bits = bitmap_size * BITS_PER_BYTE;
 	bitmap_zero(tbl.bitmap, tbl.bits);
 	/* We need to reserve slot 0 because 0 is invalid */
@@ -804,8 +805,14 @@ void cam_mem_mgr_deinit(void)
 	cam_mem_mgr_cleanup_table();
 	mutex_lock(&tbl.m_lock);
 	bitmap_zero(tbl.bitmap, tbl.bits);
-	kfree(tbl.bitmap);
-	tbl.bitmap = NULL;
+/* sony extension begin */
+	if (tbl.bitmap) {
+/* sony extension end */
+		kfree(tbl.bitmap);
+		tbl.bitmap = NULL;
+/* sony extension begin */
+	}
+/* sony extension end */
 	cam_mem_util_client_destroy();
 	mutex_unlock(&tbl.m_lock);
 	mutex_destroy(&tbl.m_lock);

@@ -32,11 +32,6 @@
  * any damages of any kind arising from your use or distribution of
  * this program.
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #ifndef _UFS_H
 #define _UFS_H
@@ -519,7 +514,7 @@ struct ufs_dev_info {
 	u8	b_device_sub_class;
 	u16	w_manufacturer_id;
 	u8	i_product_name;
-	u16	specver;
+	u16	w_spec_version;
 	u8	revision;
 
 	/* query flags */

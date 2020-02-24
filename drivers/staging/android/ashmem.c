@@ -15,11 +15,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #define pr_fmt(fmt) "ashmem: " fmt
 
@@ -384,6 +379,12 @@ static int ashmem_mmap(struct file *file, struct vm_area_struct *vma)
 
 	/* user needs to SET_SIZE before mapping */
 	if (unlikely(!asma->size)) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	/* requested mapping size larger than object size */
+	if (vma->vm_end - vma->vm_start > PAGE_ALIGN(asma->size)) {
 		ret = -EINVAL;
 		goto out;
 	}
