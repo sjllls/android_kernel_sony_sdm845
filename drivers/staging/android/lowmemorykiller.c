@@ -77,7 +77,7 @@ module_param_named(enable_lmk, enable_lmk, int, 0644);
 #include "lowmemorykiller_tng.h"
 #endif
 
-u32 lowmem_debug_level = 1;
+u32 lowmem_debug_level = 0;
 short lowmem_adj[6] = {
 	0,
 	1,
