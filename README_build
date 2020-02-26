@@ -1,0 +1,11 @@
+How to build:
+
+export ARCH=arm64
+export SUBARCH=arm64
+export DTC_EXT=/home/sjll/tool/dtc
+export DTC_OVERLAY_TEST_EXT=/home/sjll/tool/ufdt_apply_overlay_host
+export KCFLAGS=-mno-android
+export PATH=/home/sjll/aarch64-linux-android-4.9/bin:$PATH
+export CROSS_COMPILE=aarch64-linux-android-
+make CONFIG_BUILD_ARM64_DT_OVERLAY=y O=./out akari_defconfig
+make CONFIG_BUILD_ARM64_DT_OVERLAY=y O=./out -j5
