@@ -36,6 +36,7 @@
 #include "wlan_hdd_debugfs_llstat.h"
 #include "wlan_reg_services_api.h"
 #include <wlan_cfg80211_mc_cp_stats.h>
+#include "wlan_cp_stats_mc_ucfg_api.h"
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 0, 0)) && !defined(WITH_BACKPORTS)
 #define HDD_INFO_SIGNAL                 STATION_INFO_SIGNAL
@@ -6259,3 +6260,4 @@ void wlan_hdd_register_cp_stats_cb(struct hdd_context *hdd_ctx)
 					hdd_lost_link_cp_stats_info_cb);
 }
 #endif
+
