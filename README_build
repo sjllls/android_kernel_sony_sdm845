@@ -10,3 +10,9 @@ export CROSS_COMPILE=aarch64-linux-android-
 export KBUILD_DIFFCONFIG=akari_diffconfig
 make CONFIG_BUILD_ARM64_DT_OVERLAY=y O=./out sdm845-perf_defconfig
 make CONFIG_BUILD_ARM64_DT_OVERLAY=y O=./out -j5
+
+
+Now:
+kernel CAF version: LA.UM.8.3.r1-06100-sdm845.0
+Wifi: LA.UM.8.3.r1-05800-sdm845.0 
+
