@@ -7,7 +7,16 @@ export DTC_OVERLAY_TEST_EXT=/home/sjll/tool/ufdt_apply_overlay_host
 export KCFLAGS=-mno-android
 export PATH=/home/sjll/aarch64-linux-android-4.9/bin:$PATH
 export CROSS_COMPILE=aarch64-linux-android-
+
+For XZ2:
+============
 export KBUILD_DIFFCONFIG=akari_diffconfig
+make CONFIG_BUILD_ARM64_DT_OVERLAY=y O=./out sdm845-perf_defconfig
+make CONFIG_BUILD_ARM64_DT_OVERLAY=y O=./out -j5
+
+For XZ2 Compact:
+============
+export KBUILD_DIFFCONFIG=apollo_diffconfig
 make CONFIG_BUILD_ARM64_DT_OVERLAY=y O=./out sdm845-perf_defconfig
 make CONFIG_BUILD_ARM64_DT_OVERLAY=y O=./out -j5
 
