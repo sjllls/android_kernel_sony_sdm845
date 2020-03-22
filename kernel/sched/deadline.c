@@ -272,7 +272,9 @@ static struct rq *dl_task_offline_migration(struct rq *rq, struct task_struct *p
 		double_lock_balance(rq, later_rq);
 	}
 
+	walt_prepare_migrate(p, cpu_of(rq), cpu_of(later_rq), true);
 	set_task_cpu(p, later_rq->cpu);
+	walt_finish_migrate(p, cpu_of(rq), cpu_of(later_rq), true);
 	double_unlock_balance(later_rq, rq);
 
 	return later_rq;
@@ -1632,7 +1634,9 @@ retry:
 
 	next_task->on_rq = TASK_ON_RQ_MIGRATING;
 	deactivate_task(rq, next_task, 0);
+	walt_prepare_migrate(next_task, cpu_of(rq), cpu_of(later_rq), true);
 	set_task_cpu(next_task, later_rq->cpu);
+	walt_finish_migrate(next_task, cpu_of(rq), cpu_of(later_rq), true);
 	activate_task(later_rq, next_task, 0);
 	next_task->on_rq = TASK_ON_RQ_QUEUED;
 	ret = 1;
@@ -1722,7 +1726,9 @@ static void pull_dl_task(struct rq *this_rq)
 
 			p->on_rq = TASK_ON_RQ_MIGRATING;
 			deactivate_task(src_rq, p, 0);
+			walt_prepare_migrate(p, cpu_of(src_rq), cpu_of(this_rq), true);
 			set_task_cpu(p, this_cpu);
+			walt_finish_migrate(p, cpu_of(src_rq), cpu_of(this_rq), true);
 			activate_task(this_rq, p, 0);
 			p->on_rq = TASK_ON_RQ_QUEUED;
 			dmin = p->dl.deadline;

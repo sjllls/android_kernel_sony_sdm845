@@ -810,3 +810,10 @@ config USB_UPD720X
 	---help---
 	  Enables support for the USB Host controller present on the
 	  Renesas UPD720X chipsets.
+
+config USB_HOST_EXTRA_NOTIFICATION
+	bool "USB host extra notification"
+	depends on USB
+	default n
+	help
+	  Provides the functions to notify extra USB host related events.

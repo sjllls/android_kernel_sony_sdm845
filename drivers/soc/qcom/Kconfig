@@ -661,6 +661,13 @@ config MSM_PIL_SSR_GENERIC
          or a fatal error. Subsystems include LPASS, Venus, VPU, WCNSS and
          BCSS.
 
+config MSM_FORCE_PANIC_ON_WDOG_BARK
+	bool "Force Panic on watchdog bark"
+	depends on QCOM_WATCHDOG_V2
+	help
+	  Triggers a kernel panic for watchdog bark. This will print more
+	  information about the current running tasks on all the cpus.
+
 config MSM_PIL_MSS_QDSP6V5
        tristate "MSS QDSP6v5 (Hexagon) Boot Support"
        depends on MSM_PIL && MSM_SUBSYSTEM_RESTART
@@ -953,3 +960,26 @@ config BIG_CLUSTER_MIN_FREQ_ADJUST
 	  This driver is used to set the floor of the min frequency of big cluster
 	  to the user specified value when the cluster is not power collapsed. When
 	  the cluster is power collpsed it resets the value to physical limits.
+
+config SUBSYS_LAST_ERR_LOG
+	bool "support last error log for subsystems"
+	help
+	  When a fatal error is encountered, few subsystems export the
+	  error log into SMEM. This driver supports the mechanism to read
+	  these logs and exports them to user via procfs.
+	  If unsure, say N
+
+config LAST_LOGS
+	bool "support last logs for system"
+	depends on DEBUG_FS
+	select SECURITY_STATUS
+	help
+	  When a fatal error is encountered on system, system reboots and
+	  saves the logs in last logs memory. This driver supports the mechanism
+	  to read these logs and exports them via debugfs.
+
+config SECURITY_STATUS
+	bool "Get security_status"
+	help
+	  Gets security status by checking oemandroidboot.securityflags
+	  parameter.

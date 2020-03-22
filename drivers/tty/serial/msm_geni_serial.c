@@ -1855,6 +1855,9 @@ static void msm_geni_serial_set_termios(struct uart_port *uport,
 	unsigned long clk_rate;
 	unsigned long flags;
 
+	if (!termios->c_cflag)
+		return;
+
 	if (!uart_console(uport)) {
 		int ret = msm_geni_serial_power_on(uport);
 

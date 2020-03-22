@@ -78,7 +78,10 @@
 #define EXTCON_JIG		61
 #define EXTCON_MECHANICAL	62
 
-#define EXTCON_NUM		63
+/* Somc Extention */
+#define EXTCON_VBUS_DROP	63
+
+#define EXTCON_NUM		64
 
 /*
  * Define the property of supported external connectors.

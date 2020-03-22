@@ -157,6 +157,8 @@ struct spi_geni_master {
 	bool shared_se;
 	bool dis_autosuspend;
 	bool cmd_done;
+	bool adjust_ab;
+	bool adjust_ib;
 };
 
 static struct spi_master *get_spi_master(struct device *dev)
@@ -759,7 +761,9 @@ static int spi_geni_prepare_transfer_hardware(struct spi_master *spi)
 	struct se_geni_rsc *rsc = &mas->spi_rsc;
 
 	/* Adjust the IB based on the max speed of the slave.*/
-	rsc->ib = max_speed * DEFAULT_BUS_WIDTH;
+	if (mas->adjust_ib)
+		rsc->ib = max_speed * DEFAULT_BUS_WIDTH;
+
 	if (mas->shared_se) {
 		struct se_geni_rsc *rsc;
 		int ret = 0;
@@ -1343,6 +1347,8 @@ static int spi_geni_probe(struct platform_device *pdev)
 	struct platform_device *wrapper_pdev;
 	struct device_node *wrapper_ph_node;
 	bool rt_pri;
+	u32 init_ab;
+	u32 init_ib;
 
 	spi = spi_alloc_master(&pdev->dev, sizeof(struct spi_geni_master));
 	if (!spi) {
@@ -1370,10 +1376,23 @@ static int spi_geni_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Cannot retrieve wrapper device\n");
 		goto spi_geni_probe_err;
 	}
+	if (of_property_read_u32(pdev->dev.of_node, "init_ab", &init_ab)) {
+		/* Default */
+		init_ab = SPI_CORE2X_VOTE;
+	} else {
+		/* Tuned */
+		dev_info(&pdev->dev, "init_ab is tuned to %u.\n", init_ab);
+	}
+	if (of_property_read_u32(pdev->dev.of_node, "init_ib", &init_ib)) {
+		/* Default */
+		init_ib = DEFAULT_SE_CLK * DEFAULT_BUS_WIDTH;
+	} else {
+		/* Tuned */
+		dev_info(&pdev->dev, "init_ib is tuned to %u.\n", init_ib);
+	}
 	geni_mas->wrapper_dev = &wrapper_pdev->dev;
 	geni_mas->spi_rsc.wrapper_dev = &wrapper_pdev->dev;
-	ret = geni_se_resources_init(rsc, SPI_CORE2X_VOTE,
-				     (DEFAULT_SE_CLK * DEFAULT_BUS_WIDTH));
+	ret = geni_se_resources_init(rsc, init_ab, init_ib);
 	if (ret) {
 		dev_err(&pdev->dev, "Error geni_se_resources_init\n");
 		goto spi_geni_probe_err;
@@ -1436,6 +1455,19 @@ static int spi_geni_probe(struct platform_device *pdev)
 		ret = -ENXIO;
 		dev_err(&pdev->dev, "Err getting IO region\n");
 		goto spi_geni_probe_err;
+	}
+
+	if (of_property_read_bool(pdev->dev.of_node, "disable_adjust_ab")) {
+		geni_mas->adjust_ab = false;
+		dev_info(&pdev->dev, "Detect disable_adjust_ab.\n");
+	} else {
+		geni_mas->adjust_ab = true;
+	}
+	if (of_property_read_bool(pdev->dev.of_node, "disable_adjust_ib")) {
+		geni_mas->adjust_ib = false;
+		dev_info(&pdev->dev, "Detect disable_adjust_ib.\n");
+	} else {
+		geni_mas->adjust_ib = true;
 	}
 
 	rt_pri = of_property_read_bool(pdev->dev.of_node, "qcom,rt");

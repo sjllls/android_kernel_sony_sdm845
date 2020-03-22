@@ -120,6 +120,9 @@ struct usb_phy {
 	/* callback to indicate port is being reset or reset the port */
 	void	(*start_port_reset)(struct usb_phy *x);
 
+	/* initialize special */
+	int	(*init_sp)(struct usb_phy *x);
+
 	/* effective for B devices, ignored for A-peripheral */
 	int	(*set_power)(struct usb_phy *x,
 				unsigned mA);
@@ -229,6 +232,15 @@ usb_phy_start_port_reset(struct usb_phy *x)
 		return;
 
 	x->start_port_reset(x);
+}
+
+static inline int
+usb_phy_init_sp(struct usb_phy *x)
+{
+	if (x && x->init_sp)
+		return x->init_sp(x);
+
+	return -EINVAL;
 }
 
 static inline int

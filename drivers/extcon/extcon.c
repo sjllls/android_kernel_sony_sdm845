@@ -189,6 +189,11 @@ struct __extcon_info {
 		.id = EXTCON_MECHANICAL,
 		.name = "MECHANICAL",
 	},
+	[EXTCON_VBUS_DROP] = {
+		.type = EXTCON_TYPE_USB,
+		.id = EXTCON_VBUS_DROP,
+		.name = "VBUS-DROP",
+	},
 
 	{ /* sentinel */ }
 };
@@ -224,7 +229,7 @@ struct extcon_cable {
 };
 
 static struct class *extcon_class;
-#if defined(CONFIG_ANDROID)
+#if defined(CONFIG_ANDROID) && !IS_ENABLED(CONFIG_SWITCH)
 static struct class_compat *switch_class;
 #endif /* CONFIG_ANDROID */
 
@@ -1010,7 +1015,7 @@ static int create_extcon_class(void)
 			return PTR_ERR(extcon_class);
 		extcon_class->dev_groups = extcon_groups;
 
-#if defined(CONFIG_ANDROID)
+#if defined(CONFIG_ANDROID) && !IS_ENABLED(CONFIG_SWITCH)
 		switch_class = class_compat_register("switch");
 		if (WARN(!switch_class, "cannot allocate"))
 			return -ENOMEM;
@@ -1236,7 +1241,7 @@ int extcon_dev_register(struct extcon_dev *edev)
 		put_device(&edev->dev);
 		goto err_dev;
 	}
-#if defined(CONFIG_ANDROID)
+#if defined(CONFIG_ANDROID) && !IS_ENABLED(CONFIG_SWITCH)
 	if (switch_class)
 		ret = class_compat_create_link(switch_class, &edev->dev, NULL);
 #endif /* CONFIG_ANDROID */
@@ -1332,7 +1337,7 @@ void extcon_dev_unregister(struct extcon_dev *edev)
 		kfree(edev->cables);
 	}
 
-#if defined(CONFIG_ANDROID)
+#if defined(CONFIG_ANDROID) && !IS_ENABLED(CONFIG_SWITCH)
 	if (switch_class)
 		class_compat_remove_link(switch_class, &edev->dev, NULL);
 #endif
@@ -1406,7 +1411,7 @@ module_init(extcon_class_init);
 
 static void __exit extcon_class_exit(void)
 {
-#if defined(CONFIG_ANDROID)
+#if defined(CONFIG_ANDROID) && !IS_ENABLED(CONFIG_SWITCH)
 	class_compat_unregister(switch_class);
 #endif
 	class_destroy(extcon_class);

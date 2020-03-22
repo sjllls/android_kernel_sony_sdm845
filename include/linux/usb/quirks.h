@@ -59,4 +59,7 @@
 /* Device needs a pause after every control message. */
 #define USB_QUIRK_DELAY_CTRL_MSG		BIT(13)
 
+/* Device needs a vendor specific phy init. */
+#define USB_QUIRK_VENDOR_SPEC_PHY_INIT		BIT(16)
+
 #endif /* __LINUX_USB_QUIRKS_H */

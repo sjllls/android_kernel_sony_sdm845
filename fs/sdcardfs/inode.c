@@ -778,6 +778,8 @@ static int sdcardfs_getattr(struct vfsmount *mnt, struct dentry *dentry,
 	sdcardfs_copy_and_fix_attrs(d_inode(dentry),
 			      d_inode(lower_path.dentry));
 	err = sdcardfs_fillattr(mnt, d_inode(dentry), &lower_stat, stat);
+	fsstack_copy_inode_size(d_inode(dentry),
+			  d_inode(lower_path.dentry));
 out:
 	sdcardfs_put_lower_path(dentry, &lower_path);
 	return err;
