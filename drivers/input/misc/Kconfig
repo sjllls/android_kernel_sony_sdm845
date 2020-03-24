@@ -897,4 +897,10 @@ config INPUT_HISI_POWERKEY
 	  To compile this driver as a module, choose M here: the
 	  module will be called hisi_powerkey.
 
+ config FPC1075_PLATFORM
+       tristate "Platform FPC1075 fingerprint driver"
+       default n
+       help
+         Select this module to enable FPC1075 fingerprint driver
+
 endif
