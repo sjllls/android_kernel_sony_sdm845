@@ -23,6 +23,7 @@
 #include <linux/oom_score_notifier.h>
 
 #include "lowmemorykiller.h"
+#include "lowmemorykiller_tng.h"
 #include "lowmemorykiller_tasks.h"
 #include "lowmemorykiller_stats.h"
 
@@ -252,6 +253,10 @@ static int lmk_oom_score_notifier(struct notifier_block *nb,
 		break;
 	case OSN_FREE:
 		lmk_task_free(osns->tsk);
+#ifdef CONFIG_PROCESS_RECLAIM
+		/* we have died task, reset the reclaim score */
+		prc_recl_min_score_adj = LMK_TNG_WORKLOAD_MAX;
+#endif
 		break;
 	case OSN_UPDATE:
 		lmk_task_watch(osns->tsk, osns->old_score);

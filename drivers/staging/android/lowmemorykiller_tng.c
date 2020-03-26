@@ -86,12 +86,15 @@ out:
 	return tot;
 }
 
-/* can_swap check if we have memory resources to be able to swap.
+/* lmk_zone_watermark_swappable check if we have memory resources to be able to swap.
  * When we have a pressure to get more atomic or movable pages
  * it is sent through the shrinker as gfp. We can not trace it back
  * to who the consumer is.
+ * return:
+ * return 0 if we can not swap otherwise return high watermark for
+ * the selected zone
  */
-static int can_swap(gfp_t mask, int atomic_threshold, int movable_threshold)
+static unsigned long lmk_zone_watermark_swappable(gfp_t mask, int atomic_threshold, int movable_threshold)
 {
 	struct zonelist *zonelist;
 	enum zone_type high_zoneidx;
@@ -102,23 +105,26 @@ static int can_swap(gfp_t mask, int atomic_threshold, int movable_threshold)
 	struct zoneref *zref;
 	int sum_atomic = 0;
 	int sum_movable = 0;
-
-	/* if there is no need for movable or atomic we are safe */
-
-	if (atomic_threshold == 0 && movable_threshold == 0)
-		return 1;
+	unsigned long retval;
 
 	zonelist = node_zonelist(0, 0);
 
 	high_zoneidx = gfp_zone(mask);
-	zref = first_zones_zonelist(zonelist, high_zoneidx, NULL);
+	zref = first_zones_zonelist(zonelist, 0, NULL);
 	preferred_zone = zref->zone;
+
+	retval = preferred_zone->watermark[WMARK_HIGH];
+
+	/* if there is no need for movable or atomic we are safe */
+
+	if (atomic_threshold == 0 && movable_threshold == 0)
+		return retval;
 
 	/* Watermark for the zone can handle 64 pages of order 0
 	 * we assume we are safe.
 	 */
 	if (zone_watermark_ok(preferred_zone, 0, 64, high_zoneidx, mask))
-		return 1;
+		return retval;
 
 	/* this is scan is heuristic based on qualcomm hardware. */
 	/* we can swap if there is movable pages */
@@ -130,7 +136,7 @@ static int can_swap(gfp_t mask, int atomic_threshold, int movable_threshold)
 							    movable_threshold);
 			if (sum_movable >= movable_threshold &&
 			    sum_atomic >= atomic_threshold)
-				return 1;
+				return retval;
 		}
 
 		if (zone_idx == ZONE_NORMAL) {
@@ -141,7 +147,7 @@ static int can_swap(gfp_t mask, int atomic_threshold, int movable_threshold)
 
 			if (sum_movable >= movable_threshold &&
 			    sum_atomic >= atomic_threshold)
-				return 1;
+				return retval;
 
 			sum_movable +=
 				zone_threshold_check(zone,
@@ -150,7 +156,7 @@ static int can_swap(gfp_t mask, int atomic_threshold, int movable_threshold)
 
 			if (sum_movable >= movable_threshold &&
 			    sum_atomic >= atomic_threshold)
-				return 1;
+				return retval;
 		}
 	}
 	return 0;
@@ -166,24 +172,47 @@ static void calc_params(struct calculated_params *cp, gfp_t mask)
 	long usable_free_swap = 0;
 	long tot_usable = 0;
 	int start;
-	int cs = 1; /* we can swap unless the checks says no */
 	int movc = 0;
 	int atomicc = 0;
+	struct zone *zones = NODE_DATA(node)->node_zones;
+	long zone_reserved = zones[ZONE_NORMAL].watermark[WMARK_LOW];
 
 	if (free_swap > 64) {
+		unsigned long zwsp;
+
 		if (mask & __GFP_MOVABLE)
-			movc = (1 << (PAGE_ALLOC_COSTLY_ORDER + 2));
+			movc = (1 << (PAGE_ALLOC_COSTLY_ORDER));
 
 		if (mask & __GFP_ATOMIC)
 			atomicc = (1 << PAGE_ALLOC_COSTLY_ORDER);
 
-		cs = can_swap(mask, atomicc, movc);
-		if (cs) {
+		if (cp->kill_reason == LMK_SHRINKER_COUNT)
+			/* lmk_zone_watermark_swappable values are obsoleted when it is time
+			   to kill so assume ok! We will get some overhead doing more SCAN.
+			   But it is intended to be more accurate, since other shrinkers
+			   do that we can swap.
+			*/
+			zwsp = 128;
+		else
+			zwsp = lmk_zone_watermark_swappable(mask, atomicc, movc);
+
+		if (zwsp) {
+			unsigned long swappable_pages =
+			  global_node_page_state(NR_INACTIVE_ANON) +
+			  global_node_page_state(NR_ACTIVE_ANON);
+
 			if (free_swap > 0x800)
 				usable_free_swap = free_swap;
 			else
 				usable_free_swap = free_swap / 2;
 
+			swappable_pages *= 4; /* optimstic compression */
+			if (swappable_pages < zwsp &&
+			    swappable_pages < usable_free_swap) {
+				usable_free_swap = swappable_pages;
+				cp->kill_reason |= LMK_LOWIAP_SWAP;
+				lmk_inc_stats(LMK_LOW_ANON_PAGES);
+			}
 		} else {
 			cp->kill_reason |= LMK_CANT_SWAP;
 		}
@@ -194,7 +223,7 @@ static void calc_params(struct calculated_params *cp, gfp_t mask)
 	 */
 	tot_usable = usable_free_swap + irp
 	  + global_page_state(NR_FREE_CMA_PAGES);
-	cp->margin = global_page_state(NR_FREE_PAGES) - totalreserve_pages;
+	cp->margin = zone_page_state(&zones[ZONE_NORMAL], NR_FREE_PAGES) - zone_reserved;
 	cp->other_free = cp->margin + tot_usable;
 
 	if (global_node_page_state(NR_SHMEM) + total_swapcache_pages() +
@@ -238,7 +267,7 @@ static void calc_params(struct calculated_params *cp, gfp_t mask)
 		 * but can not swap.
 		 */
 		if (cp->kill_reason & LMK_CANT_SWAP) {
-			if (-6 * (cp->margin) > 5 * totalreserve_pages) {
+			if (-6 * (cp->margin) > 5 * zone_reserved) {
 				cp->kill_reason |= LMK_LOW_RESERVE;
 				cp->dynamic_max_queue_len = 1;
 				cp->min_score_adj = 0;
@@ -247,12 +276,27 @@ static void calc_params(struct calculated_params *cp, gfp_t mask)
 	}
 }
 
+#ifdef CONFIG_PROCESS_RECLAIM
+static void update_prc_recl_score(short cs)
+{
+	if (cs > (OOM_SCORE_ADJ_MAX - LMK_TNG_WORKLOAD_OFFSET) )
+		prc_recl_min_score_adj = LMK_TNG_WORKLOAD_MAX;
+	else
+		prc_recl_min_score_adj = cs - LMK_TNG_WORKLOAD_OFFSET;
+
+	/* on negative values we open reclaim for tasks */
+	if (prc_recl_min_score_adj < 0)
+		prc_recl_min_score_adj = OOM_SCORE_ADJ_MIN;
+}
+#endif
 int kill_needed(int level, gfp_t mask,
 		struct calculated_params *cp)
 {
 	calc_params(cp, mask);
 	cp->selected_oom_score_adj = level;
-
+#ifdef CONFIG_PROCESS_RECLAIM
+	update_prc_recl_score(cp->min_score_adj);
+#endif
 	if (level >= cp->min_score_adj)
 		return 1;
 	return 0;
@@ -431,6 +475,7 @@ static unsigned long lowmem_scan_tng(struct shrinker *s,
 			goto out;
 		} else {
 			lmk_inc_stats(LMK_WASTE);
+			cp.selected_tasksize = SHRINK_STOP;
 		}
 	} else {
 		lmk_inc_stats(LMK_NO_KILL);
