@@ -12,6 +12,10 @@ extern short lowmem_adj[];
 extern int lowmem_minfree[];
 extern int oom_reaper;
 
+#ifdef CONFIG_PROCESS_RECLAIM /* with SONY extentions! */
+extern short prc_recl_min_score_adj;
+#endif
+
 /* basic kill reason */
 #define LMK_VMPRESSURE		(0x1)
 #define LMK_SHRINKER_SCAN	(0x2)
@@ -20,6 +24,7 @@ extern int oom_reaper;
 /* calc option reason */
 #define LMK_LOW_RESERVE		(0x0100)
 #define LMK_CANT_SWAP		(0x0200)
+#define LMK_LOWIAP_SWAP		(0x0400)
 
 /* function in lowmemorykiller.c */
 int lowmem_min_param_size(void);
@@ -31,4 +36,7 @@ void tune_lmk_param_mask(int *other_free, int *other_file, gfp_t mask);
 void __init lowmem_init_tng(struct shrinker *shrinker);
 void balance_cache(unsigned long vmpressure);
 void mark_lmk_victim(struct task_struct *tsk);
+
+#define LMK_TNG_WORKLOAD_OFFSET (250)
+#define LMK_TNG_WORKLOAD_MAX (600)
 #endif
