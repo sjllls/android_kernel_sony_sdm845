@@ -71,6 +71,8 @@ obj-$(CONFIG_SIM_DETECT)	+= sim_detect.o
 
 obj-$(CONFIG_SENSORS_TCS3490)	+= tcs3490.o
 
+obj-$(CONFIG_TOF_SENSOR)        += tof_sensor.o
+
 lkdtm-$(CONFIG_LKDTM)		+= lkdtm_core.o
 lkdtm-$(CONFIG_LKDTM)		+= lkdtm_bugs.o
 lkdtm-$(CONFIG_LKDTM)		+= lkdtm_heap.o
