@@ -3877,6 +3877,22 @@ static int tavil_codec_set_idle_detect_thr(struct snd_soc_codec *codec,
 	return 0;
 }
 
+static void tavil_codec_set_offset_val(int *offset_val, int gain_offset,
+				       int mult)
+{
+	switch (gain_offset) {
+	case WCD934X_RX_GAIN_OFFSET_M0P5_DB:
+		*offset_val = 1 * mult;
+		break;
+	case WCD934X_RX_GAIN_OFFSET_M1P5_DB:
+		*offset_val = 2 * mult;
+		break;
+	default:
+		pr_err("Improper gain offset\n");
+		break;
+	}
+}
+
 static int tavil_codec_enable_mix_path(struct snd_soc_dapm_widget *w,
 				       struct snd_kcontrol *kcontrol,
 				       int event)
@@ -3911,8 +3927,8 @@ static int tavil_codec_enable_mix_path(struct snd_soc_dapm_widget *w,
 		snd_soc_update_bits(codec, mix_reg, 0x20, 0x20);
 		break;
 	case SND_SOC_DAPM_POST_PMU:
-		if ((tavil->swr.spkr_gain_offset ==
-		     WCD934X_RX_GAIN_OFFSET_M1P5_DB) &&
+		if ((tavil->swr.spkr_gain_offset !=
+		     WCD934X_RX_GAIN_OFFSET_0_DB) &&
 		    (tavil->comp_enabled[COMPANDER_7] ||
 		     tavil->comp_enabled[COMPANDER_8]) &&
 		    (gain_reg == WCD934X_CDC_RX7_RX_VOL_MIX_CTL ||
@@ -3927,7 +3943,8 @@ static int tavil_codec_enable_mix_path(struct snd_soc_dapm_widget *w,
 			snd_soc_update_bits(codec,
 					    WCD934X_CDC_RX8_RX_PATH_MIX_SEC0,
 					    0x01, 0x01);
-			offset_val = -2;
+			tavil_codec_set_offset_val(&offset_val,
+						   tavil->swr.spkr_gain_offset, -1);
 		}
 		val = snd_soc_read(codec, gain_reg);
 		val += offset_val;
@@ -3942,8 +3959,8 @@ static int tavil_codec_enable_mix_path(struct snd_soc_dapm_widget *w,
 		snd_soc_update_bits(codec, mix_reg, 0x40, 0x40);
 		snd_soc_update_bits(codec, mix_reg, 0x40, 0x00);
 
-		if ((tavil->swr.spkr_gain_offset ==
-		     WCD934X_RX_GAIN_OFFSET_M1P5_DB) &&
+		if ((tavil->swr.spkr_gain_offset !=
+		     WCD934X_RX_GAIN_OFFSET_0_DB) &&
 		    (tavil->comp_enabled[COMPANDER_7] ||
 		     tavil->comp_enabled[COMPANDER_8]) &&
 		    (gain_reg == WCD934X_CDC_RX7_RX_VOL_MIX_CTL ||
@@ -3958,7 +3975,8 @@ static int tavil_codec_enable_mix_path(struct snd_soc_dapm_widget *w,
 			snd_soc_update_bits(codec,
 					    WCD934X_CDC_RX8_RX_PATH_MIX_SEC0,
 					    0x01, 0x00);
-			offset_val = 2;
+			tavil_codec_set_offset_val(&offset_val,
+						   tavil->swr.spkr_gain_offset, 1);
 			val = snd_soc_read(codec, gain_reg);
 			val += offset_val;
 			snd_soc_write(codec, gain_reg, val);
@@ -4027,8 +4045,8 @@ static int tavil_codec_enable_main_path(struct snd_soc_dapm_widget *w,
 		break;
 	case SND_SOC_DAPM_POST_PMU:
 		/* apply gain after int clk is enabled */
-		if ((tavil->swr.spkr_gain_offset ==
-					WCD934X_RX_GAIN_OFFSET_M1P5_DB) &&
+		if ((tavil->swr.spkr_gain_offset !=
+					WCD934X_RX_GAIN_OFFSET_0_DB) &&
 		    (tavil->comp_enabled[COMPANDER_7] ||
 		     tavil->comp_enabled[COMPANDER_8]) &&
 		    (gain_reg == WCD934X_CDC_RX7_RX_VOL_CTL ||
@@ -4043,7 +4061,8 @@ static int tavil_codec_enable_main_path(struct snd_soc_dapm_widget *w,
 			snd_soc_update_bits(codec,
 					    WCD934X_CDC_RX8_RX_PATH_MIX_SEC0,
 					    0x01, 0x01);
-			offset_val = -2;
+			tavil_codec_set_offset_val(&offset_val,
+						   tavil->swr.spkr_gain_offset, -1);
 		}
 		val = snd_soc_read(codec, gain_reg);
 		val += offset_val;
@@ -4053,8 +4072,8 @@ static int tavil_codec_enable_main_path(struct snd_soc_dapm_widget *w,
 	case SND_SOC_DAPM_POST_PMD:
 		tavil_codec_enable_interp_clk(codec, event, w->shift);
 
-		if ((tavil->swr.spkr_gain_offset ==
-					WCD934X_RX_GAIN_OFFSET_M1P5_DB) &&
+		if ((tavil->swr.spkr_gain_offset !=
+					WCD934X_RX_GAIN_OFFSET_0_DB) &&
 		    (tavil->comp_enabled[COMPANDER_7] ||
 		     tavil->comp_enabled[COMPANDER_8]) &&
 		    (gain_reg == WCD934X_CDC_RX7_RX_VOL_CTL ||
@@ -4069,7 +4088,8 @@ static int tavil_codec_enable_main_path(struct snd_soc_dapm_widget *w,
 			snd_soc_update_bits(codec,
 					    WCD934X_CDC_RX8_RX_PATH_MIX_SEC0,
 					    0x01, 0x00);
-			offset_val = 2;
+			tavil_codec_set_offset_val(&offset_val,
+						   tavil->swr.spkr_gain_offset, 1);
 			val = snd_soc_read(codec, gain_reg);
 			val += offset_val;
 			snd_soc_write(codec, gain_reg, val);
@@ -9463,6 +9483,7 @@ static const struct tavil_reg_mask_val tavil_codec_reg_init_common_val[] = {
 	{WCD934X_MICB2_TEST_CTL_1, 0xff, 0xfa},
 	{WCD934X_MICB3_TEST_CTL_1, 0xff, 0xfa},
 	{WCD934X_MICB4_TEST_CTL_1, 0xff, 0xfa},
+	{WCD934X_CDC_RX3_RX_PATH_CFG1, 0x64, 0x00},
 };
 
 static void tavil_codec_init_reg(struct tavil_priv *priv)
@@ -10965,7 +10986,7 @@ static int tavil_probe(struct platform_device *pdev)
 	tavil->swr.plat_data.bulk_write = tavil_swrm_bulk_write;
 	tavil->swr.plat_data.clk = tavil_swrm_clock;
 	tavil->swr.plat_data.handle_irq = tavil_swrm_handle_irq;
-	tavil->swr.spkr_gain_offset = WCD934X_RX_GAIN_OFFSET_0_DB;
+	tavil->swr.spkr_gain_offset = WCD934X_RX_GAIN_OFFSET_M0P5_DB;
 
 	/* Register for Clock */
 	wcd_ext_clk = clk_get(tavil->wcd9xxx->dev, "wcd_clk");
