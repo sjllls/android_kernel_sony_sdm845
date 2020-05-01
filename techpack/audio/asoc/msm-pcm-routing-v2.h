@@ -437,6 +437,8 @@ enum {
 #define BE_DAI_PORT_SESSIONS_IDX_MAX		4
 #define BE_DAI_FE_SESSIONS_IDX_MAX		2
 
+#define NUM_BEX_MODULES 16
+
 enum {
 	ADM_TOPOLOGY_CAL_TYPE_IDX = 0,
 	ADM_LSM_TOPOLOGY_CAL_TYPE_IDX,
@@ -489,6 +491,15 @@ struct msm_pcm_stream_app_type_cfg {
 	int app_type;
 	int acdb_dev_id;
 	int sample_rate;
+};
+
+struct msm_media_vibration_volume_params {
+	uint32_t beat_enhancement_volume_l;
+	uint32_t beat_enhancement_volume_r;
+	uint32_t level_volume_l;
+	uint32_t level_volume_r;
+	uint32_t audio_volume_l;
+	uint32_t audio_volume_r;
 };
 
 /* dai_id: front-end ID,

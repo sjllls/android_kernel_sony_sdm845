@@ -688,4 +688,8 @@ uint8_t q6asm_get_stream_id_from_token(uint32_t token);
 int q6asm_adjust_session_clock(struct audio_client *ac,
 		uint32_t adjust_time_lsw,
 		uint32_t adjust_time_msw);
+
+/* SOMC added: Send tuning parameter for Sony effect*/
+int sony_hweffect_send_tuning_params(unsigned int effect_id, void *client);
+
 #endif /* __Q6_ASM_H__ */
