@@ -2581,8 +2581,19 @@ static enum cpe_svc_result cpe_tgt_wcd9335_write_RAM(struct cpe_info *t_info,
 			return CPE_SVC_FAILED;
 		}
 
+#if 0
 		cpe_register_write_repeat(WCD9335_CPE_SS_MEM_BANK_0,
 			temp_ptr, to_write);
+#else
+		rc = cpe_register_write_repeat(WCD9335_CPE_SS_MEM_BANK_0,
+			temp_ptr, to_write);
+		if (rc) {
+			pr_err("%s: cpe_register_write_repeat error rc=%d\n", __func__, rc);
+			cpe_register_write(WCD9335_CPE_SS_MEM_CTRL, 0);
+			return rc;
+		}
+#endif
+
 		temp_size += CHUNK_SIZE;
 		temp_ptr += CHUNK_SIZE;
 	}

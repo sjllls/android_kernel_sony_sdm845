@@ -48,6 +48,11 @@
 #define DS2_ADM_COPP_TOPOLOGY_ID 0xFFFFFFFF
 #endif
 
+#ifdef CONFIG_FORCE_24BIT_COPP
+#define APPTYPE_GENERAL_PLAYBACK 0x00011130
+#define APPTYPE_SYSTEM_SOUNDS 0x00011131
+#endif
+
 /* ENUM for adm_status */
 enum adm_cal_status {
 	ADM_STATUS_CALIBRATION_REQUIRED = 0,
@@ -1023,6 +1028,81 @@ int adm_send_params_v5(int port_id, int copp_idx, char *params,
 	}
 	rc = 0;
 send_param_return:
+	kfree(adm_params);
+	return rc;
+}
+
+int adm_ahc_send_params(int port_id, int copp_idx, char *params,
+			uint32_t params_length)
+{
+	struct adm_cmd_set_pp_params_v5	*adm_params = NULL;
+	int sz, rc = 0;
+	int port_idx;
+
+	pr_debug("%s:\n", __func__);
+	port_id = afe_convert_virtual_to_portid(port_id);
+	port_idx = adm_validate_and_get_port_index(port_id);
+	if (port_idx < 0) {
+		pr_err("%s: Invalid port_id 0x%x\n", __func__, port_id);
+		return -EINVAL;
+	}
+
+	sz = sizeof(struct adm_cmd_set_pp_params_v5) + params_length;
+	adm_params = kzalloc(sz, GFP_KERNEL);
+	if (!adm_params) {
+		pr_err("%s, adm params memory alloc failed", __func__);
+		return -ENOMEM;
+	}
+
+	memcpy(((u8 *)adm_params + sizeof(struct adm_cmd_set_pp_params_v5)),
+			params, params_length);
+	adm_params->hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
+	adm_params->hdr.pkt_size = sz;
+	adm_params->hdr.src_svc = APR_SVC_ADM;
+	adm_params->hdr.src_domain = APR_DOMAIN_APPS;
+	adm_params->hdr.src_port = port_id;
+	adm_params->hdr.dest_svc = APR_SVC_ADM;
+	adm_params->hdr.dest_domain = APR_DOMAIN_ADSP;
+	adm_params->hdr.dest_port =
+			atomic_read(&this_adm.copp.id[port_idx][copp_idx]);
+	adm_params->hdr.token = port_idx << 16 | copp_idx;
+	adm_params->hdr.opcode = ADM_CMD_SET_PP_PARAMS_V5;
+	adm_params->payload_addr_lsw = 0;
+	adm_params->payload_addr_msw = 0;
+	adm_params->mem_map_handle = 0;
+	adm_params->payload_size = params_length;
+
+	atomic_set(&this_adm.copp.stat[port_idx][copp_idx], -1);
+	rc = apr_send_pkt(this_adm.apr, (uint32_t *)adm_params);
+	if (rc < 0) {
+		pr_err("%s: Set params failed port = 0x%x rc %d\n",
+			__func__, port_id, rc);
+		rc = -EINVAL;
+		goto ahc_send_param_return;
+	}
+	/* Wait for the callback */
+	rc = wait_event_timeout(this_adm.copp.wait[port_idx][copp_idx],
+		atomic_read(&this_adm.copp.stat[port_idx][copp_idx]) >= 0,
+		msecs_to_jiffies(TIMEOUT_MS));
+	if (!rc) {
+		pr_err("%s: Set params timed out port = 0x%x\n",
+			 __func__, port_id);
+		rc = -EINVAL;
+		goto ahc_send_param_return;
+	} else if (atomic_read(&this_adm.copp.stat
+				[port_idx][copp_idx]) > 0) {
+		pr_err("%s: DSP returned error[%s]\n",
+				__func__, adsp_err_get_err_str(
+				atomic_read(&this_adm.copp.stat
+				[port_idx][copp_idx])));
+		rc = adsp_err_get_lnx_err_code(
+				atomic_read(&this_adm.copp.stat
+					[port_idx][copp_idx]));
+		goto ahc_send_param_return;
+	}
+	rc = 0;
+ahc_send_param_return:
 	kfree(adm_params);
 	return rc;
 }
@@ -2449,6 +2529,21 @@ int adm_open(int port_id, int path, int rate, int channel_mode, int topology,
 		 __func__, port_id, path, rate, channel_mode, perf_mode,
 		 topology);
 
+#ifdef CONFIG_FORCE_24BIT_COPP
+	if ((topology == ADM_CMD_COPP_OPENOPOLOGY_ID_SPEAKER_STEREO_AUDIO_COPP_SOMC_HP) &&
+		(app_type == APPTYPE_GENERAL_PLAYBACK)) {
+		bit_width = 24;
+		pr_debug("%s: Force open adm in 24-bit for SOMC HP topology 0x%x\n",
+			__func__, topology);
+	} else if (((topology == ADM_CMD_COPP_OPENOPOLOGY_ID_SPEAKER_RX_MCH_IIR_COPP_MBDRC_V3) ||
+		(topology == ADM_CMD_COPP_OPENOPOLOGY_ID_SPEAKER_RX_MCH_FIR_IIR_COPP_MBDRC_V3) ||
+		(topology == ADM_CMD_COPP_OPENOPOLOGY_ID_AUDIO_RX_SONY_SPEAKER)) &&
+		((app_type == APPTYPE_GENERAL_PLAYBACK) || (app_type == APPTYPE_SYSTEM_SOUNDS))) {
+		bit_width = 24;
+		pr_debug("%s: Force open adm in 24-bit for SOMC Speaker topology 0x%x\n",
+			__func__, topology);
+	}
+#endif
 	port_id = q6audio_convert_virtual_to_portid(port_id);
 	port_idx = adm_validate_and_get_port_index(port_id);
 	if (port_idx < 0) {
@@ -4886,6 +4981,600 @@ done:
 	pr_debug("%s: Exit, ret=%d\n", __func__, ret);
 
 	return ret;
+}
+
+int adm_set_beatenhancer_volume(int port_id, int copp_idx,
+					uint32_t volume_l, uint32_t volume_r)
+{
+	struct audproc_beat_enhancer_volume_params audproc_bevol;
+	int sz = 0;
+	int rc  = 0;
+	int port_idx;
+
+	pr_debug("%s: volume_l %d volume_r %d\n", __func__, volume_l, volume_r);
+	port_id = afe_convert_virtual_to_portid(port_id);
+	port_idx = adm_validate_and_get_port_index(port_id);
+	if (port_idx < 0) {
+		pr_err("%s: Invalid port_id %#x\n", __func__, port_id);
+		rc = -EINVAL;
+		goto fail_cmd;
+	}
+
+	if (copp_idx < 0 || copp_idx >= MAX_COPPS_PER_PORT) {
+		pr_err("%s: Invalid copp_num: %d\n", __func__, copp_idx);
+		return -EINVAL;
+	}
+
+	sz = sizeof(struct audproc_beat_enhancer_volume_params);
+
+	audproc_bevol.params.hdr.hdr_field =
+				APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
+	audproc_bevol.params.hdr.pkt_size = sz;
+	audproc_bevol.params.hdr.src_svc = APR_SVC_ADM;
+	audproc_bevol.params.hdr.src_domain = APR_DOMAIN_APPS;
+	audproc_bevol.params.hdr.src_port = port_id;
+	audproc_bevol.params.hdr.dest_svc = APR_SVC_ADM;
+	audproc_bevol.params.hdr.dest_domain = APR_DOMAIN_ADSP;
+	audproc_bevol.params.hdr.dest_port =
+			atomic_read(&this_adm.copp.id[port_idx][copp_idx]);
+	audproc_bevol.params.hdr.token = port_idx << 16 | copp_idx;
+	audproc_bevol.params.hdr.opcode = ADM_CMD_SET_PP_PARAMS_V5;
+	audproc_bevol.params.payload_addr_lsw = 0;
+	audproc_bevol.params.payload_addr_msw = 0;
+	audproc_bevol.params.mem_map_handle = 0;
+	audproc_bevol.params.payload_size = sizeof(audproc_bevol) -
+				sizeof(audproc_bevol.params);
+	audproc_bevol.data.module_id = AUDPROC_MODULE_ID_BE_VOL_LIMITER_1;
+	audproc_bevol.data.param_id = AUDPROC_PARAM_ID_BE_VOL_CTRL;
+	audproc_bevol.data.param_size = audproc_bevol.params.payload_size -
+				sizeof(audproc_bevol.data);
+	audproc_bevol.data.reserved = 0;
+	audproc_bevol.volume_l = volume_l;
+	audproc_bevol.volume_r = volume_r;
+
+	pr_debug("%s: L volume %d, R volume %d\n", __func__,
+			audproc_bevol.volume_l, audproc_bevol.volume_r);
+
+	atomic_set(&this_adm.copp.stat[port_idx][copp_idx], -1);
+	rc = apr_send_pkt(this_adm.apr, (uint32_t *)&audproc_bevol);
+	if (rc < 0) {
+		pr_err("%s: Set params failed port = %#x\n",
+			__func__, port_id);
+		rc = -EINVAL;
+		goto fail_cmd;
+	}
+	/* Wait for the callback */
+	rc = wait_event_timeout(this_adm.copp.wait[port_idx][copp_idx],
+		atomic_read(&this_adm.copp.stat[port_idx][copp_idx]) >= 0,
+		msecs_to_jiffies(TIMEOUT_MS));
+	if (!rc) {
+		pr_err("%s: Beat Enhancer volume Set params timed out port = %#x\n",
+			 __func__, port_id);
+		rc = -EINVAL;
+		goto fail_cmd;
+	} else if (atomic_read(&this_adm.copp.stat
+				[port_idx][copp_idx]) > 0) {
+		pr_err("%s: DSP returned error[%s]\n",
+				__func__, adsp_err_get_err_str(
+				atomic_read(&this_adm.copp.stat
+				[port_idx][copp_idx])));
+		rc = adsp_err_get_lnx_err_code(
+				atomic_read(&this_adm.copp.stat
+					[port_idx][copp_idx]));
+		goto fail_cmd;
+	}
+	rc = 0;
+
+fail_cmd:
+	return rc;
+}
+
+int adm_set_level_volume(int port_id, int copp_idx,
+					uint32_t volume_l, uint32_t volume_r)
+{
+	struct audproc_beat_enhancer_volume_params audproc_bevol;
+	int sz = 0;
+	int rc  = 0;
+	int port_idx;
+
+	pr_debug("%s: volume_l %d volume_r %d\n", __func__, volume_l, volume_r);
+	port_id = afe_convert_virtual_to_portid(port_id);
+	port_idx = adm_validate_and_get_port_index(port_id);
+	if (port_idx < 0) {
+		pr_err("%s: Invalid port_id %#x\n", __func__, port_id);
+		rc = -EINVAL;
+		goto fail_cmd;
+	}
+
+	if (copp_idx < 0 || copp_idx >= MAX_COPPS_PER_PORT) {
+		pr_err("%s: Invalid copp_num: %d\n", __func__, copp_idx);
+		return -EINVAL;
+	}
+
+	sz = sizeof(struct audproc_beat_enhancer_volume_params);
+
+	audproc_bevol.params.hdr.hdr_field =
+				APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
+	audproc_bevol.params.hdr.pkt_size = sz;
+	audproc_bevol.params.hdr.src_svc = APR_SVC_ADM;
+	audproc_bevol.params.hdr.src_domain = APR_DOMAIN_APPS;
+	audproc_bevol.params.hdr.src_port = port_id;
+	audproc_bevol.params.hdr.dest_svc = APR_SVC_ADM;
+	audproc_bevol.params.hdr.dest_domain = APR_DOMAIN_ADSP;
+	audproc_bevol.params.hdr.dest_port =
+			atomic_read(&this_adm.copp.id[port_idx][copp_idx]);
+	audproc_bevol.params.hdr.token = port_idx << 16 | copp_idx;
+	audproc_bevol.params.hdr.opcode = ADM_CMD_SET_PP_PARAMS_V5;
+	audproc_bevol.params.payload_addr_lsw = 0;
+	audproc_bevol.params.payload_addr_msw = 0;
+	audproc_bevol.params.mem_map_handle = 0;
+	audproc_bevol.params.payload_size = sizeof(audproc_bevol) -
+				sizeof(audproc_bevol.params);
+	audproc_bevol.data.module_id = AUDPROC_MODULE_ID_BE_VOL_LIMITER_6;
+	audproc_bevol.data.param_id = AUDPROC_PARAM_ID_BE_VOL_CTRL;
+	audproc_bevol.data.param_size = audproc_bevol.params.payload_size -
+				sizeof(audproc_bevol.data);
+	audproc_bevol.data.reserved = 0;
+	audproc_bevol.volume_l = volume_l;
+	audproc_bevol.volume_r = volume_r;
+
+	pr_debug("%s: L volume %d, R volume %d\n", __func__,
+			audproc_bevol.volume_l, audproc_bevol.volume_r);
+
+	atomic_set(&this_adm.copp.stat[port_idx][copp_idx], -1);
+	rc = apr_send_pkt(this_adm.apr, (uint32_t *)&audproc_bevol);
+	if (rc < 0) {
+		pr_err("%s: Set params failed port = %#x\n",
+			__func__, port_id);
+		rc = -EINVAL;
+		goto fail_cmd;
+	}
+	/* Wait for the callback */
+	rc = wait_event_timeout(this_adm.copp.wait[port_idx][copp_idx],
+		atomic_read(&this_adm.copp.stat[port_idx][copp_idx]) >= 0,
+		msecs_to_jiffies(TIMEOUT_MS));
+	if (!rc) {
+		pr_err("%s: Beat Enhancer volume Set params timed out port = %#x\n",
+			 __func__, port_id);
+		rc = -EINVAL;
+		goto fail_cmd;
+	} else if (atomic_read(&this_adm.copp.stat
+				[port_idx][copp_idx]) > 0) {
+		pr_err("%s: DSP returned error[%s]\n",
+				__func__, adsp_err_get_err_str(
+				atomic_read(&this_adm.copp.stat
+				[port_idx][copp_idx])));
+		rc = adsp_err_get_lnx_err_code(
+				atomic_read(&this_adm.copp.stat
+					[port_idx][copp_idx]));
+		goto fail_cmd;
+	}
+	rc = 0;
+
+fail_cmd:
+	return rc;
+}
+
+int adm_set_inverse_volume(int port_id, int copp_idx,
+					uint32_t volume_l, uint32_t volume_r)
+{
+	struct audproc_inverse_audio_volume_params audproc_invol;
+	int sz = 0;
+	int rc  = 0;
+	int port_idx;
+
+	pr_debug("%s: volume_l %d volume_r %d\n", __func__, volume_l, volume_r);
+	port_id = afe_convert_virtual_to_portid(port_id);
+	port_idx = adm_validate_and_get_port_index(port_id);
+	if (port_idx < 0) {
+		pr_err("%s: Invalid port_id %#x\n", __func__, port_id);
+		rc = -EINVAL;
+		goto fail_cmd;
+	}
+
+	if (copp_idx < 0 || copp_idx >= MAX_COPPS_PER_PORT) {
+		pr_err("%s: Invalid copp_num: %d\n", __func__, copp_idx);
+		return -EINVAL;
+	}
+
+	sz = sizeof(struct audproc_inverse_audio_volume_params);
+
+	audproc_invol.params.hdr.hdr_field =
+				APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
+	audproc_invol.params.hdr.pkt_size = sz;
+	audproc_invol.params.hdr.src_svc = APR_SVC_ADM;
+	audproc_invol.params.hdr.src_domain = APR_DOMAIN_APPS;
+	audproc_invol.params.hdr.src_port = port_id;
+	audproc_invol.params.hdr.dest_svc = APR_SVC_ADM;
+	audproc_invol.params.hdr.dest_domain = APR_DOMAIN_ADSP;
+	audproc_invol.params.hdr.dest_port =
+			atomic_read(&this_adm.copp.id[port_idx][copp_idx]);
+	audproc_invol.params.hdr.token = port_idx << 16 | copp_idx;
+	audproc_invol.params.hdr.opcode = ADM_CMD_SET_PP_PARAMS_V5;
+	audproc_invol.params.payload_addr_lsw = 0;
+	audproc_invol.params.payload_addr_msw = 0;
+	audproc_invol.params.mem_map_handle = 0;
+	audproc_invol.params.payload_size = sizeof(audproc_invol) -
+				sizeof(audproc_invol.params);
+	audproc_invol.data.module_id = AUDPROC_MODULE_ID_INV_VOL_CTRL;
+	audproc_invol.data.param_id = AUDPROC_PARAM_ID_INV_VOL_CTRL;
+	audproc_invol.data.param_size = audproc_invol.params.payload_size -
+				sizeof(audproc_invol.data);
+	audproc_invol.data.reserved = 0;
+	audproc_invol.volume_l = volume_l;
+	audproc_invol.volume_r = volume_r;
+
+	pr_debug("%s: L volume %d, R volume %d\n", __func__,
+			audproc_invol.volume_l, audproc_invol.volume_r);
+
+	atomic_set(&this_adm.copp.stat[port_idx][copp_idx], -1);
+	rc = apr_send_pkt(this_adm.apr, (uint32_t *)&audproc_invol);
+	if (rc < 0) {
+		pr_err("%s: Set params failed port = %#x\n",
+			__func__, port_id);
+		rc = -EINVAL;
+		goto fail_cmd;
+	}
+	/* Wait for the callback */
+	rc = wait_event_timeout(this_adm.copp.wait[port_idx][copp_idx],
+		atomic_read(&this_adm.copp.stat[port_idx][copp_idx]) >= 0,
+		msecs_to_jiffies(TIMEOUT_MS));
+	if (!rc) {
+		pr_err("%s: Inverse volume Set params timed out port = %#x\n",
+			 __func__, port_id);
+		rc = -EINVAL;
+		goto fail_cmd;
+	} else if (atomic_read(&this_adm.copp.stat
+				[port_idx][copp_idx]) > 0) {
+		pr_err("%s: DSP returned error[%s]\n",
+				__func__, adsp_err_get_err_str(
+				atomic_read(&this_adm.copp.stat
+				[port_idx][copp_idx])));
+		rc = adsp_err_get_lnx_err_code(
+				atomic_read(&this_adm.copp.stat
+					[port_idx][copp_idx]));
+		goto fail_cmd;
+	}
+	rc = 0;
+
+fail_cmd:
+	return rc;
+}
+
+int adm_set_delay_module_state(int port_id, int copp_idx, uint32_t enable)
+{
+	struct audproc_enable_module_stereo delay_enable;
+	int sz = 0;
+	int rc  = 0;
+	int port_idx;
+
+	pr_debug("%s: enable: %d\n", __func__, enable);
+	port_id = afe_convert_virtual_to_portid(port_id);
+	port_idx = adm_validate_and_get_port_index(port_id);
+	if (port_idx < 0) {
+		pr_err("%s: Invalid port_id %#x\n", __func__, port_id);
+		rc = -EINVAL;
+		goto fail_cmd;
+	}
+
+	if (copp_idx < 0 || copp_idx >= MAX_COPPS_PER_PORT) {
+		pr_err("%s: Invalid copp_num: %d\n", __func__, copp_idx);
+		return -EINVAL;
+	}
+
+	sz = sizeof(struct audproc_enable_module_stereo);
+
+	delay_enable.params.hdr.hdr_field =
+				APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
+	delay_enable.params.hdr.pkt_size = sz;
+	delay_enable.params.hdr.src_svc = APR_SVC_ADM;
+	delay_enable.params.hdr.src_domain = APR_DOMAIN_APPS;
+	delay_enable.params.hdr.src_port = port_id;
+	delay_enable.params.hdr.dest_svc = APR_SVC_ADM;
+	delay_enable.params.hdr.dest_domain = APR_DOMAIN_ADSP;
+	delay_enable.params.hdr.dest_port =
+			atomic_read(&this_adm.copp.id[port_idx][copp_idx]);
+	delay_enable.params.hdr.token = port_idx << 16 | copp_idx;
+	delay_enable.params.hdr.opcode = ADM_CMD_SET_PP_PARAMS_V5;
+	delay_enable.params.payload_addr_lsw = 0;
+	delay_enable.params.payload_addr_msw = 0;
+	delay_enable.params.mem_map_handle = 0;
+	delay_enable.params.payload_size = sizeof(delay_enable) -
+				sizeof(delay_enable.params);
+	delay_enable.data.module_id = AUDPROC_MODULE_ID_DELAY;
+	delay_enable.data.param_id = AUDPROC_PARAM_ID_DELAY_ENABLE;
+	delay_enable.data.param_size = delay_enable.params.payload_size -
+				sizeof(delay_enable.data);
+	delay_enable.data.reserved = 0;
+	delay_enable.num_channels = 2;
+	delay_enable.enable_left = enable;
+	delay_enable.enable_right = enable;
+
+	pr_debug("%s: delay module state: {L:%d, R:%d}\n", __func__,
+			delay_enable.enable_left, delay_enable.enable_right);
+
+	atomic_set(&this_adm.copp.stat[port_idx][copp_idx], -1);
+	rc = apr_send_pkt(this_adm.apr, (uint32_t *)&delay_enable);
+	if (rc < 0) {
+		pr_err("%s: Set params failed port = %#x\n",
+			__func__, port_id);
+		rc = -EINVAL;
+		goto fail_cmd;
+	}
+	/* Wait for the callback */
+	rc = wait_event_timeout(this_adm.copp.wait[port_idx][copp_idx],
+		atomic_read(&this_adm.copp.stat[port_idx][copp_idx]) >= 0,
+		msecs_to_jiffies(TIMEOUT_MS));
+	if (!rc) {
+		pr_err("%s: Inverse volume Set params timed out port = %#x\n",
+			 __func__, port_id);
+		rc = -EINVAL;
+		goto fail_cmd;
+	} else if (atomic_read(&this_adm.copp.stat
+				[port_idx][copp_idx]) > 0) {
+		pr_err("%s: DSP returned error[%s]\n",
+				__func__, adsp_err_get_err_str(
+				atomic_read(&this_adm.copp.stat
+				[port_idx][copp_idx])));
+		rc = adsp_err_get_lnx_err_code(
+				atomic_read(&this_adm.copp.stat
+					[port_idx][copp_idx]));
+		goto fail_cmd;
+	}
+	rc = 0;
+
+fail_cmd:
+	return rc;
+}
+
+int adm_set_all_bex_modules(int port_id, int copp_idx,
+				uint32_t module_id, uint32_t param_id, uint32_t enable_flag)
+{
+	struct audproc_enable_module_mono audproc_enable_mono;
+	struct audproc_enable_module_stereo audproc_enable_stereo;
+	int sz = 0;
+	int rc  = 0;
+	int port_idx;
+
+	pr_debug("%s: enable_flag %d\n", __func__, enable_flag);
+	port_id = afe_convert_virtual_to_portid(port_id);
+	port_idx = adm_validate_and_get_port_index(port_id);
+	if (port_idx < 0) {
+		pr_err("%s: Invalid port_id %#x\n", __func__, port_id);
+		rc = -EINVAL;
+		goto fail_cmd;
+	}
+
+	if (copp_idx < 0 || copp_idx >= MAX_COPPS_PER_PORT) {
+		pr_err("%s: Invalid copp_num: %d\n", __func__, copp_idx);
+		return -EINVAL;
+	}
+
+	sz = sizeof(struct audproc_enable_module_mono);
+	sz = sizeof(struct audproc_enable_module_stereo);
+
+	switch(module_id) {
+	case AUDPROC_MODULE_ID_LOG10GAIN:
+	case AUDPROC_MODULE_ID_NOISE_CUT:
+	case AUDPROC_MODULE_ID_NEGATIVE_CUT:
+	case AUDPROC_MODULE_ID_VOLUME_LIMITER:
+	case AUDPROC_MODULE_ID_BE_VOL_LIMITER_1:
+	case AUDPROC_MODULE_ID_VOLUME_LIMITER_2:
+	case AUDPROC_MODULE_ID_VOLUME_LIMITER_3:
+	case AUDPROC_MODULE_ID_VOLUME_LIMITER_4:
+	case AUDPROC_MODULE_ID_VOLUME_LIMITER_5:
+	case AUDPROC_MODULE_ID_BE_VOL_LIMITER_6:
+	case AUDPROC_MODULE_ID_ABS:
+	case AUDPROC_MODULE_ID_ADD1:
+	case AUDPROC_MODULE_ID_INV_VOL_CTRL: {
+		audproc_enable_stereo.params.hdr.hdr_field =
+				APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
+		audproc_enable_stereo.params.hdr.pkt_size = sz;
+		audproc_enable_stereo.params.hdr.src_svc = APR_SVC_ADM;
+		audproc_enable_stereo.params.hdr.src_domain = APR_DOMAIN_APPS;
+		audproc_enable_stereo.params.hdr.src_port = port_id;
+		audproc_enable_stereo.params.hdr.dest_svc = APR_SVC_ADM;
+		audproc_enable_stereo.params.hdr.dest_domain = APR_DOMAIN_ADSP;
+		audproc_enable_stereo.params.hdr.dest_port =
+			atomic_read(&this_adm.copp.id[port_idx][copp_idx]);
+		audproc_enable_stereo.params.hdr.token = port_idx << 16 | copp_idx;
+		audproc_enable_stereo.params.hdr.opcode = ADM_CMD_SET_PP_PARAMS_V5;
+		audproc_enable_stereo.params.payload_addr_lsw = 0;
+		audproc_enable_stereo.params.payload_addr_msw = 0;
+		audproc_enable_stereo.params.mem_map_handle = 0;
+		audproc_enable_stereo.params.payload_size = sizeof(audproc_enable_stereo) -
+				sizeof(audproc_enable_stereo.params);
+		audproc_enable_stereo.data.module_id = module_id;
+		audproc_enable_stereo.data.param_id = param_id;
+		audproc_enable_stereo.data.param_size = audproc_enable_stereo.params.payload_size -
+				sizeof(audproc_enable_stereo.data);
+		audproc_enable_stereo.data.reserved = 0;
+		audproc_enable_stereo.num_channels = 2;
+		audproc_enable_stereo.enable_left = enable_flag;
+		audproc_enable_stereo.enable_right = enable_flag;
+
+		pr_debug("%s: Change state of module:%x to {L:%d, R:%d}\n", __func__,
+			audproc_enable_stereo.data.module_id,
+			audproc_enable_stereo.enable_left,
+			audproc_enable_stereo.enable_right);
+
+		atomic_set(&this_adm.copp.stat[port_idx][copp_idx], -1);
+		rc = apr_send_pkt(this_adm.apr, (uint32_t *)&audproc_enable_stereo);
+		if (rc < 0) {
+			pr_err("%s: Set params failed port = %#x\n",
+				__func__, port_id);
+			rc = -EINVAL;
+			goto fail_cmd;
+		}
+		break;
+	}
+	case AUDPROC_MODULE_ID_DUAL_MONO:
+	case AUDPROC_MODULE_ID_DUAL_MONO1: {
+
+		audproc_enable_mono.params.hdr.hdr_field =
+				APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
+		audproc_enable_mono.params.hdr.pkt_size = sz;
+		audproc_enable_mono.params.hdr.src_svc = APR_SVC_ADM;
+		audproc_enable_mono.params.hdr.src_domain = APR_DOMAIN_APPS;
+		audproc_enable_mono.params.hdr.src_port = port_id;
+		audproc_enable_mono.params.hdr.dest_svc = APR_SVC_ADM;
+		audproc_enable_mono.params.hdr.dest_domain = APR_DOMAIN_ADSP;
+		audproc_enable_mono.params.hdr.dest_port =
+			atomic_read(&this_adm.copp.id[port_idx][copp_idx]);
+		audproc_enable_mono.params.hdr.token = port_idx << 16 | copp_idx;
+		audproc_enable_mono.params.hdr.opcode = ADM_CMD_SET_PP_PARAMS_V5;
+		audproc_enable_mono.params.payload_addr_lsw = 0;
+		audproc_enable_mono.params.payload_addr_msw = 0;
+		audproc_enable_mono.params.mem_map_handle = 0;
+		audproc_enable_mono.params.payload_size = sizeof(audproc_enable_mono) -
+				sizeof(audproc_enable_mono.params);
+		audproc_enable_mono.data.module_id = module_id;
+		audproc_enable_mono.data.param_id = param_id;
+		audproc_enable_mono.data.param_size = audproc_enable_mono.params.payload_size -
+				sizeof(audproc_enable_mono.data);
+		audproc_enable_mono.data.reserved = 0;
+		audproc_enable_mono.enable_flag = enable_flag;
+
+		pr_debug("%s: Change state of module:%x to %d\n", __func__,
+			audproc_enable_stereo.data.module_id,
+			audproc_enable_mono.enable_flag);
+
+		atomic_set(&this_adm.copp.stat[port_idx][copp_idx], -1);
+		rc = apr_send_pkt(this_adm.apr, (uint32_t *)&audproc_enable_mono);
+		if (rc < 0) {
+			pr_err("%s: Set params failed port = %#x\n",
+				__func__, port_id);
+			rc = -EINVAL;
+			goto fail_cmd;
+		}
+		break;
+	}
+	default:
+		pr_err("%s: unhandled module id: %x\n", __func__, module_id);
+		rc = -EINVAL;
+		goto fail_cmd;
+	}
+
+	/* Wait for the callback */
+	rc = wait_event_timeout(this_adm.copp.wait[port_idx][copp_idx],
+		atomic_read(&this_adm.copp.stat[port_idx][copp_idx]) >= 0,
+		msecs_to_jiffies(TIMEOUT_MS));
+	if (!rc) {
+		pr_err("%s: Setting all Bex modules timed out port = %#x\n",
+			 __func__, port_id);
+		rc = -EINVAL;
+		goto fail_cmd;
+	} else if (atomic_read(&this_adm.copp.stat
+				[port_idx][copp_idx]) > 0) {
+		pr_err("%s: DSP returned error[%s]\n",
+				__func__, adsp_err_get_err_str(
+				atomic_read(&this_adm.copp.stat
+				[port_idx][copp_idx])));
+		rc = adsp_err_get_lnx_err_code(
+				atomic_read(&this_adm.copp.stat
+					[port_idx][copp_idx]));
+		goto fail_cmd;
+	}
+	rc = 0;
+
+fail_cmd:
+	return rc;
+}
+
+int adm_set_rampup_clipper(int port_id, int copp_idx, uint32_t enable,
+				uint32_t module_id)
+{
+	struct audproc_enable_rampup_clipper_module clipper_enable;
+	int sz = 0;
+	int rc  = 0;
+	int port_idx;
+
+	pr_debug("%s: enable: %d\n", __func__, enable);
+	port_id = afe_convert_virtual_to_portid(port_id);
+	port_idx = adm_validate_and_get_port_index(port_id);
+	if (port_idx < 0) {
+		pr_err("%s: Invalid port_id %#x\n", __func__, port_id);
+		rc = -EINVAL;
+		goto fail_cmd;
+	}
+
+	if (copp_idx < 0 || copp_idx >= MAX_COPPS_PER_PORT) {
+		pr_err("%s: Invalid copp_num: %d\n", __func__, copp_idx);
+		return -EINVAL;
+	}
+
+	sz = sizeof(struct audproc_enable_rampup_clipper_module);
+
+	clipper_enable.params.hdr.hdr_field =
+				APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
+	clipper_enable.params.hdr.pkt_size = sz;
+	clipper_enable.params.hdr.src_svc = APR_SVC_ADM;
+	clipper_enable.params.hdr.src_domain = APR_DOMAIN_APPS;
+	clipper_enable.params.hdr.src_port = port_id;
+	clipper_enable.params.hdr.dest_svc = APR_SVC_ADM;
+	clipper_enable.params.hdr.dest_domain = APR_DOMAIN_ADSP;
+	clipper_enable.params.hdr.dest_port =
+			atomic_read(&this_adm.copp.id[port_idx][copp_idx]);
+	clipper_enable.params.hdr.token = port_idx << 16 | copp_idx;
+	clipper_enable.params.hdr.opcode = ADM_CMD_SET_PP_PARAMS_V5;
+	clipper_enable.params.payload_addr_lsw = 0;
+	clipper_enable.params.payload_addr_msw = 0;
+	clipper_enable.params.mem_map_handle = 0;
+	clipper_enable.params.payload_size = sizeof(clipper_enable) -
+				sizeof(clipper_enable.params);
+	clipper_enable.data.module_id = module_id;
+	clipper_enable.data.param_id = AUDPROC_PARAM_ID_RAMP_UP_CLIPPER_ENABLE;
+	clipper_enable.data.param_size = clipper_enable.params.payload_size -
+				sizeof(clipper_enable.data);
+	clipper_enable.data.reserved = 0;
+	clipper_enable.num_channels = 2;
+	clipper_enable.clipper_enable_left = 0;
+	clipper_enable.clipper_enable_right = 0;
+	clipper_enable.gain_fade_in_enable_left = enable;
+	clipper_enable.gain_fade_in_enable_right = 0;
+
+	pr_debug("%s: Clipper module %#x state: %d\n", __func__, clipper_enable.data.module_id,
+			clipper_enable.gain_fade_in_enable_left);
+
+	atomic_set(&this_adm.copp.stat[port_idx][copp_idx], -1);
+	rc = apr_send_pkt(this_adm.apr, (uint32_t *)&clipper_enable);
+	if (rc < 0) {
+		pr_err("%s: Set params failed port = %#x\n",
+			__func__, port_id);
+		rc = -EINVAL;
+		goto fail_cmd;
+	}
+	/* Wait for the callback */
+	rc = wait_event_timeout(this_adm.copp.wait[port_idx][copp_idx],
+		atomic_read(&this_adm.copp.stat[port_idx][copp_idx]) >= 0,
+		msecs_to_jiffies(TIMEOUT_MS));
+	if (!rc) {
+		pr_err("%s: Ramp up Clipper Set params timed out port = %#x\n",
+			 __func__, port_id);
+		rc = -EINVAL;
+		goto fail_cmd;
+	} else if (atomic_read(&this_adm.copp.stat
+				[port_idx][copp_idx]) > 0) {
+		pr_err("%s: DSP returned error[%s]\n",
+				__func__, adsp_err_get_err_str(
+				atomic_read(&this_adm.copp.stat
+				[port_idx][copp_idx])));
+		rc = adsp_err_get_lnx_err_code(
+				atomic_read(&this_adm.copp.stat
+					[port_idx][copp_idx]));
+		goto fail_cmd;
+	}
+	rc = 0;
+
+fail_cmd:
+	return rc;
 }
 
 static int __init adm_init(void)

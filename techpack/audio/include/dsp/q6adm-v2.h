@@ -102,6 +102,9 @@ int adm_send_params_v5(int port_id, int copp_idx, char *params,
 int adm_dolby_dap_send_params(int port_id, int copp_idx, char *params,
 			      uint32_t params_length);
 
+int adm_ahc_send_params(int port_id, int copp_idx, char *params,
+			uint32_t params_length);
+
 int adm_open(int port, int path, int rate, int mode, int topology,
 			   int perf_mode, uint16_t bits_per_sample,
 			   int app_type, int acdbdev_id);
@@ -187,4 +190,17 @@ int adm_programable_channel_mixer(int port_id, int copp_idx, int session_id,
 			int session_type,
 			struct msm_pcm_channel_mixer *ch_mixer,
 			int channel_index);
+int adm_set_beatenhancer_volume(int port_id, int copp_idx,
+				uint32_t volume_l, uint32_t volume_r);
+int adm_set_level_volume(int port_id, int copp_idx,
+				uint32_t volume_l, uint32_t volume_r);
+int adm_set_inverse_volume(int port_id, int copp_idx,
+				uint32_t volume_l, uint32_t volume_r);
+int adm_set_delay_module_state(int port_id, int copp_idx, uint32_t enable);
+
+int adm_set_all_bex_modules(int port_id, int copp_idx,
+				uint32_t module_id, uint32_t param_id, uint32_t enable_flag);
+int adm_set_rampup_clipper(int port_id, int copp_idx, uint32_t enable,
+				uint32_t module_id);
+
 #endif /* __Q6_ADM_V2_H__ */
