@@ -868,12 +868,13 @@ static int lan78xx_read_otp(struct lan78xx_net *dev, u32 offset,
 	ret = lan78xx_read_raw_otp(dev, 0, 1, &sig);
 
 	if (ret == 0) {
-		if (sig == OTP_INDICATOR_1)
-			offset = offset;
-		else if (sig == OTP_INDICATOR_2)
-			offset += 0x100;
-		else
-			ret = -EINVAL;
+		if (sig != OTP_INDICATOR_1) {
+			if (sig == OTP_INDICATOR_2)
+				offset += 0x100;
+			else
+				ret = -EINVAL;
+		}
+
 		if (!ret)
 			ret = lan78xx_read_raw_otp(dev, offset, length, data);
 	}
@@ -2626,6 +2627,11 @@ static int lan78xx_bind(struct lan78xx_net *dev, struct usb_interface *intf)
 	int i;
 
 	ret = lan78xx_get_endpoints(dev, intf);
+	if (ret) {
+		netdev_warn(dev->net, "lan78xx_get_endpoints failed: %d\n",
+			    ret);
+		return ret;
+	}
 
 	dev->data[0] = (unsigned long)kzalloc(sizeof(*pdata), GFP_KERNEL);
 

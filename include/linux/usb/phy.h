@@ -23,6 +23,7 @@
 #define PHY_HSFS_MODE		BIT(8)
 #define PHY_LS_MODE		BIT(9)
 #define PHY_USB_DP_CONCURRENT_MODE	BIT(10)
+#define PHY_SOFT_CONNECT	BIT(11)
 
 enum usb_phy_interface {
 	USBPHY_INTERFACE_MODE_UNKNOWN,
@@ -146,6 +147,7 @@ struct usb_phy {
 
 	/* reset the PHY clocks */
 	int     (*reset)(struct usb_phy *x);
+	int	(*drive_dp_pulse)(struct usb_phy *x, unsigned int pulse_width);
 
 	/* for notification of usb_phy_dbg_events */
 	void    (*dbg_event)(struct usb_phy *x,
@@ -248,6 +250,15 @@ usb_phy_reset(struct usb_phy *x)
 {
 	if (x && x->reset)
 		return x->reset(x);
+
+	return 0;
+}
+
+static inline int
+usb_phy_drive_dp_pulse(struct usb_phy *x, unsigned int pulse_width)
+{
+	if (x && x->drive_dp_pulse)
+		return x->drive_dp_pulse(x, pulse_width);
 
 	return 0;
 }

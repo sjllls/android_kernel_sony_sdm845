@@ -268,7 +268,7 @@ struct zs_pool {
 	struct inode *inode;
 	struct work_struct free_work;
 	/* A wait queue for when migration races with async_free_zspage() */
-        wait_queue_head_t migration_wait;
+	wait_queue_head_t migration_wait;
 	atomic_long_t isolated_pages;
 	bool destroying;
 #endif
@@ -2514,7 +2514,9 @@ struct zs_pool *zs_create_pool(const char *name)
 	if (!pool->name)
 		goto err;
 
+#ifdef CONFIG_COMPACTION
 	init_waitqueue_head(&pool->migration_wait);
+#endif
 
 	if (create_cache(pool))
 		goto err;
