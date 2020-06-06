@@ -3294,7 +3294,7 @@ __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 	return NULL;
 }
 
-#ifdef CONFIG_ANDROID_LOW_MEMORY_KILLER
+#if defined(CONFIG_ANDROID_LOW_MEMORY_KILLER) && !defined(CONFIG_HAVE_LOW_MEMORY_KILLER_TNG)
 static inline bool
 should_compact_lmk_retry(struct alloc_context *ac, int order, int alloc_flags)
 {

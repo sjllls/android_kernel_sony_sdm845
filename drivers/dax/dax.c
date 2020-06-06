@@ -530,6 +530,7 @@ static int dax_open(struct inode *inode, struct file *filp)
 	inode->i_mapping = dax_dev->inode->i_mapping;
 	inode->i_mapping->host = dax_dev->inode;
 	filp->f_mapping = inode->i_mapping;
+	filp->f_wb_err = filemap_sample_wb_err(filp->f_mapping);
 	filp->private_data = dax_dev;
 	inode->i_flags = S_DAX;
 
