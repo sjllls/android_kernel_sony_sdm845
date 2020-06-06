@@ -663,7 +663,13 @@ static int qrtr_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
 	}
 
 	if (plen != len) {
-		skb_pad(skb, plen - len);
+		rc = skb_pad(skb, plen - len);
+		if (rc) {
+			/* skb is freed by skb_pad in case of an error */
+			pr_err("%s: failed to pad size %lu to %lu rc:%d\n", __func__,
+			       len, plen, rc);
+			goto out_node;
+		}
 		skb_put(skb, plen - len);
 	}
 
