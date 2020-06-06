@@ -353,6 +353,7 @@ static void stop_pcm(struct msm_pcm_loopback *pcm)
 
 	if (pcm->audio_client == NULL)
 		return;
+
 	mutex_lock(&loopback_session_lock);
 	q6asm_cmd(pcm->audio_client, CMD_CLOSE);
 

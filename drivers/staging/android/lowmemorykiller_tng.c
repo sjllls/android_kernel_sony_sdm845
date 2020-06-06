@@ -276,7 +276,7 @@ static void calc_params(struct calculated_params *cp, gfp_t mask)
 	}
 }
 
-#ifdef CONFIG_PROCESS_RECLAIM
+#if defined(CONFIG_PROCESS_RECLAIM) && defined(CONFIG_LOWMEMORY_KILLER_TNG_VMPRESSURE)
 static void update_prc_recl_score(short cs)
 {
 	if (cs > (OOM_SCORE_ADJ_MAX - LMK_TNG_WORKLOAD_OFFSET) )
@@ -294,7 +294,7 @@ int kill_needed(int level, gfp_t mask,
 {
 	calc_params(cp, mask);
 	cp->selected_oom_score_adj = level;
-#ifdef CONFIG_PROCESS_RECLAIM
+#if defined(CONFIG_PROCESS_RECLAIM) && defined(CONFIG_LOWMEMORY_KILLER_TNG_VMPRESSURE)
 	update_prc_recl_score(cp->min_score_adj);
 #endif
 	if (level >= cp->min_score_adj)
@@ -323,7 +323,8 @@ void print_obituary(struct task_struct *doomed,
 		     "   GFP mask is 0x%x\n"
 		     "   Indirect Reclaimable is %zdkB\n"
 		     "   Free Swap %ldkB\n"
-		     "   queue len is %d of max %d reason:0x%x margin:%d\n",
+		     "   queue len is %d of max %d reason:0x%x margin:%d\n"
+		     "   psi full is %lu psi some is %lu\n",
 		     doomed->comm, doomed->pid,
 		     cp->selected_oom_score_adj,
 		     cp->selected_tasksize / 1024,
@@ -352,7 +353,14 @@ void print_obituary(struct task_struct *doomed,
 		     get_nr_swap_pages() * (long)(PAGE_SIZE / 1024),
 		     death_pending_len,
 		     cp->dynamic_max_queue_len,
-		     cp->kill_reason, cp->margin);
+		     cp->kill_reason, cp->margin,
+#ifdef CONFIG_PSI
+		     psi_system.avg[PSI_MEM_FULL][0],
+		     psi_system.avg[PSI_MEM_SOME][0]
+#else
+		     0L, 0L
+#endif
+		     );
 }
 
 static unsigned long lowmem_count_tng(struct shrinker *s,

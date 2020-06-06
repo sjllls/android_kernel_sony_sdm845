@@ -37,6 +37,9 @@ struct lmk_stats {
 	atomic_long_t balance_waste;
 	atomic_long_t mem_error;
 	atomic_long_t low_anon_pages; /* nr calls when we are now on pages to swapout */
+	atomic_long_t psi_fastblock;
+	atomic_long_t psi_low;
+	atomic_long_t psi_kill;
 
 	atomic_long_t unknown; /* internal */
 } st;
@@ -92,6 +95,16 @@ void lmk_inc_stats(int key)
 	case LMK_LOW_ANON_PAGES:
 		atomic_long_inc(&st.low_anon_pages);
 		break;
+	case LMK_PSI_FASTBLOCK:
+		atomic_long_inc(&st.psi_fastblock);
+		break;
+	case LMK_PSI_LOW:
+		atomic_long_inc(&st.psi_low);
+		break;
+	case LMK_PSI_KILL:
+		atomic_long_inc(&st.psi_kill);
+		break;
+
 	default:
 		atomic_long_inc(&st.unknown);
 		break;
@@ -120,6 +133,12 @@ static int lmk_proc_show(struct seq_file *m, void *v)
 		   atomic_long_read(&st.mem_error));
 	seq_printf(m, "low anonymous pages: %ld\n",
 		   atomic_long_read(&st.low_anon_pages));
+	seq_printf(m, "psi low: %ld\n",
+		   atomic_long_read(&st.psi_low));
+	seq_printf(m, "psi fastblock: %ld\n",
+		   atomic_long_read(&st.psi_fastblock));
+	seq_printf(m, "psi kills: %ld\n",
+		   atomic_long_read(&st.psi_kill));
 	seq_printf(m, "unknown: %ld (internal)\n",
 		   atomic_long_read(&st.unknown));
 

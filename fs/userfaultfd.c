@@ -481,6 +481,8 @@ static int userfaultfd_release(struct inode *inode, struct file *file)
 	 */
 	down_write(&mm->mmap_sem);
 	still_valid = mmget_still_valid(mm);
+	if (!mmget_still_valid(mm))
+		goto skip_mm;
 	prev = NULL;
 	for (vma = mm->mmap; vma; vma = vma->vm_next) {
 		cond_resched();
@@ -508,6 +510,7 @@ static int userfaultfd_release(struct inode *inode, struct file *file)
 		vma->vm_userfaultfd_ctx = NULL_VM_UFFD_CTX;
 		vm_write_end(vma);
 	}
+skip_mm:
 	up_write(&mm->mmap_sem);
 	mmput(mm);
 wakeup:

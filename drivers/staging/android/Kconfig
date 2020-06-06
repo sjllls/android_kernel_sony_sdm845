@@ -36,6 +36,17 @@ config ANDROID_LOW_MEMORY_KILLER_TNG
 	  scripts (/init.rc), and it defines priority values with minimum free memory size
 	  for each priority.
 
+config ANDROID_LOW_MEMORY_KILLER_TNG_VMPRESSURE
+	bool "Android Low Memory Killer TNG vmpressure"
+	---help---
+	  This hooks in to qualcomm vmpressure notifiers for kernel tasks.
+
+config ANDROID_LOW_MEMORY_KILLER_TNG_PSI
+	bool "Android Low Memory Killer TNG PSI"
+	depends on PSI
+	---help---
+	  Use PSI memory pressure to hint lowmemorykiller TNG about currect memory needs.
+
 config ANDROID_LOW_MEMORY_KILLER_AUTODETECT_OOM_ADJ_VALUES
 	bool "Android Low Memory Killer: detect oom_adj values"
 	depends on ANDROID_LOW_MEMORY_KILLER || ANDROID_LOW_MEMORY_KILLER_TNG
