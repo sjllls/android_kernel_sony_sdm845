@@ -20,6 +20,12 @@ export KBUILD_DIFFCONFIG=apollo_diffconfig
 make CONFIG_BUILD_ARM64_DT_OVERLAY=y O=./out sdm845-perf_defconfig
 make CONFIG_BUILD_ARM64_DT_OVERLAY=y O=./out -j5
 
+For XZ2 Premium:
+============
+export KBUILD_DIFFCONFIG=aurora_diffconfig
+make CONFIG_BUILD_ARM64_DT_OVERLAY=y O=./out sdm845-perf_defconfig
+make CONFIG_BUILD_ARM64_DT_OVERLAY=y O=./out -j5
+
 Now:
 kernel CAF version: LA.UM.8.3.r1-07600-sdm845.0
 Wifi: LA.UM.8.3.r1-07600-sdm845.0 
