@@ -3427,7 +3427,7 @@ ol_txrx_clear_peer(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
  */
 void peer_unmap_timer_handler(void *data)
 {
-	//ol_txrx_peer_handle peer = (ol_txrx_peer_handle)data;
+	ol_txrx_peer_handle peer = (ol_txrx_peer_handle)data;
 
 	if (!peer)
 		return;
