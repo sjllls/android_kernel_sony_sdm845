@@ -1135,6 +1135,9 @@ struct siw_ts {
 
 #if defined(SOMC_TOUCH_BRINGUP)
 	struct siw_probe_session session;
+	int irq_enable_status;
+	int cover_status;
+	struct device virtdev;
 #endif
 };
 
@@ -1718,6 +1721,9 @@ extern int siw_touch_init_late(struct siw_ts *ts, int value);
 
 extern int siw_touch_notify(struct siw_ts *ts, unsigned long event, void *data);
 
+#if defined(SOMC_TOUCH_BRINGUP)
+extern int siw_hal_tc_driving(struct device *dev, int mode);
+#endif
 
 #if defined(CONFIG_TOUCHSCREEN_SIWMON) || defined(CONFIG_TOUCHSCREEN_SIWMON_MODULE)
 

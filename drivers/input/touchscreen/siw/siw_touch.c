@@ -1895,7 +1895,7 @@ EXPORT_SYMBOL_GPL(siw_mon_deregister);
 
 #if defined(SOMC_TOUCH_BRINGUP)
 
-#define SIW_RETRY_SESSION_COUNT 10
+#define SIW_RETRY_SESSION_COUNT 30
 
 void siw_init_late_session_work(struct work_struct *work)
 {

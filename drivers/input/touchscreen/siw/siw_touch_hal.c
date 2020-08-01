@@ -162,7 +162,11 @@ void __weak siw_hal_watch_rtc_on(struct device *dev)
 
 static int siw_hal_reset_ctrl(struct device *dev, int ctrl);
 
+#if defined(SOMC_TOUCH_BRINGUP)
+int siw_hal_tc_driving(struct device *dev, int mode);
+#else
 static int siw_hal_tc_driving(struct device *dev, int mode);
+#endif
 
 
 #define t_hal_bus_info(_dev, fmt, args...)	\
@@ -4782,6 +4786,12 @@ static inline int __used siw_hal_tc_driving_u3(struct device *dev)
 	if (atomic_read(&ts->state.debug_option_mask) & DEBUG_OPTION_1)
 		ctrl &= ~TC_DRIVE_CTL_MODE_6LHB;
 
+#if defined(SOMC_TOUCH_BRINGUP)	/*  Use Doze/Active Mode */
+	if (!atomic_read(&ts->state.glove)) {
+	       ctrl |= 0x10;		/* 0x185 → 0x195 */
+	}
+#endif
+
 	return ctrl;
 }
 
@@ -4891,7 +4901,11 @@ out:
 	return 0;
 }
 
+#if defined(SOMC_TOUCH_BRINGUP)
+int siw_hal_tc_driving(struct device *dev, int mode)
+#else
 static int siw_hal_tc_driving(struct device *dev, int mode)
+#endif
 {
 	struct siw_touch_chip *chip = to_touch_chip(dev);
 	struct siw_ts *ts = chip->ts;
@@ -7843,14 +7857,16 @@ static int siw_hal_do_suspend(struct device *dev)
 
 static int siw_hal_do_resume(struct device *dev)
 {
+#ifndef SOMC_TOUCH_BRINGUP
 	struct siw_ts *ts = to_touch_core(dev);
+#endif
 
 	siw_hal_power(dev, POWER_ON);
-
+#ifndef SOMC_TOUCH_BRINGUP
 	siw_hal_trigger_gpio_reset(dev);	//Double check for reset
 
 	touch_msleep(ts->caps.hw_reset_delay);
-
+#endif
 	return 0;
 }
 #else	/* __SIW_CONFIG_SYSTEM_PM */

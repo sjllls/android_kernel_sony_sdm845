@@ -508,7 +508,11 @@ out:
 }
 #endif	/* __SYS_USE_IME_STATE */
 
+#if defined(SOMC_TOUCH_BRINGUP)
+static ssize_t _show_quick_cover_mode(struct device *dev, char *buf)
+#else
 static ssize_t _show_quick_cover_state(struct device *dev, char *buf)
+#endif
 {
 	struct siw_ts *ts = to_touch_core(dev);
 	int value = 0;
@@ -527,8 +531,13 @@ static ssize_t _show_quick_cover_state(struct device *dev, char *buf)
 	return (ssize_t)size;
 }
 
+#if defined(SOMC_TOUCH_BRINGUP)
+static ssize_t _store_quick_cover_mode(struct device *dev,
+				const char *buf, size_t count)
+#else
 static ssize_t _store_quick_cover_state(struct device *dev,
 				const char *buf, size_t count)
+#endif
 {
 	struct siw_ts *ts = to_touch_core(dev);
 	int value = 0;
@@ -537,7 +546,16 @@ static ssize_t _store_quick_cover_state(struct device *dev,
 		siw_sysfs_err_invalid_param(dev);
 		return count;
 	}
-
+#if defined(SOMC_TOUCH_BRINGUP)
+	if (value == QUICKCOVER_OPEN) {
+		value = QUICKCOVER_OPT_BASE + 1;
+	} else if (value == QUICKCOVER_CLOSE) {
+		value = QUICKCOVER_OPT_BASE;
+	} else {
+		siw_sysfs_err_invalid_param(dev);
+		return count;
+	}
+#endif
 	mutex_lock(&ts->lock);
 
 	switch (value) {
@@ -574,6 +592,89 @@ static ssize_t _store_quick_cover_state(struct device *dev,
 
 	return count;
 }
+
+#if defined(SOMC_TOUCH_BRINGUP)
+static ssize_t _show_quick_cover_status(struct device *dev, char *buf)
+{
+	struct siw_ts *ts = to_touch_core(dev);
+	int size = 0;
+
+	size += siw_snprintf(buf, size, "COVER STATUS : %d\n",
+			ts->cover_status);
+
+	return (ssize_t)size;
+}
+
+static ssize_t _store_quick_cover_status(struct device *dev,
+				const char *buf, size_t count)
+{
+	struct siw_ts *ts = to_touch_core(dev);
+	int param[4] = {0, };
+	int mfts_mode = 0;
+	int value = 0;
+
+	mfts_mode = siw_touch_boot_mode_check(dev);
+	if ((mfts_mode >= MINIOS_MFTS_FOLDER) && !ts->role.mfts_lpwg)
+		return count;
+
+	if (sscanf(buf, "%d", &value) <= 0) {
+		siw_sysfs_err_invalid_param(dev);
+		return count;
+	}
+
+	ts->cover_status = value;
+	param[0] = 0;
+	param[1] = 1;
+	param[2] = ts->irq_enable_status;
+	param[3] = ts->cover_status;
+
+	mutex_lock(&ts->lock);
+	siw_ops_lpwg(ts, LPWG_UPDATE_ALL, param);
+	mutex_unlock(&ts->lock);
+
+	return count;
+}
+
+static ssize_t _show_irq_enable_status(struct device *dev, char *buf)
+{
+	struct siw_ts *ts = to_touch_core(dev);
+	int size = 0;
+
+	size += siw_snprintf(buf, size, "IRQ ENABLE(FORSE SLEEP) : %d\n",
+			ts->irq_enable_status);
+
+	return (ssize_t)size;
+}
+
+static ssize_t _store_irq_enable_status(struct device *dev,
+				const char *buf, size_t count)
+{
+	struct siw_ts *ts = to_touch_core(dev);
+	int param[4] = {0, };
+	int mfts_mode = 0;
+	int value = 0;
+
+	mfts_mode = siw_touch_boot_mode_check(dev);
+	if ((mfts_mode >= MINIOS_MFTS_FOLDER) && !ts->role.mfts_lpwg)
+		return count;
+
+	if (sscanf(buf, "%d", &value) <= 0) {
+		siw_sysfs_err_invalid_param(dev);
+		return count;
+	}
+	ts->irq_enable_status = value;
+	param[0] = 0;
+	param[1] = 1;
+	param[2] = ts->irq_enable_status;
+	param[3] = ts->cover_status;
+
+	mutex_lock(&ts->lock);
+	siw_ops_lpwg(ts, LPWG_UPDATE_ALL, param);
+	mutex_unlock(&ts->lock);
+
+	return count;
+}
+#endif
 
 static ssize_t _show_version_info(struct device *dev, char *buf)
 {
@@ -1250,6 +1351,28 @@ out:
 	return count;
 }
 
+static int __store_g_not_allowed(struct device *dev)
+{
+	struct siw_touch_chip *chip = to_touch_chip(dev);
+	struct siw_ts *ts = chip->ts;
+
+#if defined(__SIW_CONFIG_SYSTEM_PM)
+	if (atomic_read(&ts->state.fb) != FB_RESUME) {
+		return 1;
+	}
+#endif	/* __SIW_CONFIG_SYSTEM_PM */
+
+	if (atomic_read(&ts->state.pm) != DEV_PM_RESUME) {
+		return 1;
+	}
+
+	if (atomic_read(&chip->init) != IC_INIT_DONE) {
+		return 1;
+	}
+
+	return 0;
+}
+
 static ssize_t __show_g_state(struct device *dev, char *buf,
 					int value, const char *name)
 {
@@ -1300,11 +1423,22 @@ static ssize_t _store_glove_state(struct device *dev,
 	if (ret >= 0) {
 		mutex_lock(&ts->lock);
 		atomic_set(&ts->state.glove, value);
+		if (__store_g_not_allowed(dev)) {
+			t_dev_warn(dev, "Glove skipped\n");
+			goto skip_glove_con;
+		}
+
+#if defined(SOMC_TOUCH_BRINGUP)
+		siw_hal_tc_driving(dev, LCD_MODE_STOP);
+		siw_hal_tc_driving(dev, LCD_MODE_U3);
+#endif
 		siw_ops_tc_con(ts, TCON_GLOVE, NULL);
+
+skip_glove_con:
 		mutex_unlock(&ts->lock);
 	}
 
-	return (ssize_t)count;
+	return count;
 }
 
 static ssize_t _show_grab_state(struct device *dev, char *buf)
@@ -1326,11 +1460,18 @@ static ssize_t _store_grab_state(struct device *dev,
 	if (ret >= 0) {
 		mutex_lock(&ts->lock);
 		atomic_set(&ts->state.grab, value);
+		if (__store_g_not_allowed(dev)) {
+			t_dev_warn(dev, "Grab skipped\n");
+			goto skip_grab_con;
+		}
+
 		siw_ops_tc_con(ts, TCON_GRAB, NULL);
+
+skip_grab_con:
 		mutex_unlock(&ts->lock);
 	}
 
-	return (ssize_t)count;
+	return count;
 }
 
 ssize_t __weak show_sys_con(struct device *dev, char *buf)
@@ -1382,9 +1523,21 @@ static SIW_TOUCH_ATTR(ime_status,
 						_show_ime_state,
 						_store_ime_state);
 #endif	/* __SYS_USE_LOCKSCREEN */
+#if defined(SOMC_TOUCH_BRINGUP)
+static SIW_TOUCH_ATTR(cover_mode,
+						_show_quick_cover_mode,
+						_store_quick_cover_mode);
+static SIW_TOUCH_ATTR(cover_status,
+						_show_quick_cover_status,
+						_store_quick_cover_status);
+static SIW_TOUCH_ATTR(irq_enable,
+						_show_irq_enable_status,
+						_store_irq_enable_status);
+#else
 static SIW_TOUCH_ATTR(quick_cover_status,
 						_show_quick_cover_state,
 						_store_quick_cover_state);
+#endif
 static SIW_TOUCH_ATTR(firmware,
 						_show_version_info, NULL);
 static SIW_TOUCH_ATTR(version,
@@ -1439,9 +1592,15 @@ static SIW_TOUCH_ATTR(dbg_mon,
 						_store_dbg_mon);
 static SIW_TOUCH_ATTR(dbg_test, NULL,
 						_store_dbg_test);
+#if defined(SOMC_TOUCH_BRINGUP)
+static SIW_TOUCH_ATTR(glove_mode,
+						_show_glove_state,
+						_store_glove_state);
+#else
 static SIW_TOUCH_ATTR(glove_status,
 						_show_glove_state,
 						_store_glove_state);
+#endif
 static SIW_TOUCH_ATTR(grab_status,
 						_show_grab_state,
 						_store_grab_state);
@@ -1486,7 +1645,13 @@ static struct attribute *siw_touch_attribute_list_normal[] = {
 #if defined(__SYS_USE_IME_STATE)
 	&_SIW_TOUCH_ATTR_T(ime_status).attr,
 #endif	/* __SYS_USE_IME_STATE */
+#if defined(SOMC_TOUCH_BRINGUP)
+	&_SIW_TOUCH_ATTR_T(cover_mode).attr,
+	&_SIW_TOUCH_ATTR_T(cover_status).attr,
+	&_SIW_TOUCH_ATTR_T(irq_enable).attr,
+#else
 	&_SIW_TOUCH_ATTR_T(quick_cover_status).attr,
+#endif
 	&_SIW_TOUCH_ATTR_T(firmware).attr,
 	&_SIW_TOUCH_ATTR_T(version).attr,
 	&_SIW_TOUCH_ATTR_T(testmode_ver).attr,
@@ -1504,7 +1669,11 @@ static struct attribute *siw_touch_attribute_list_normal[] = {
 #endif	/* __SIW_SUPPORT_ASC */
 	&_SIW_TOUCH_ATTR_T(dbg_mon).attr,
 	&_SIW_TOUCH_ATTR_T(dbg_test).attr,
+#if defined(SOMC_TOUCH_BRINGUP)
+	&_SIW_TOUCH_ATTR_T(glove_mode).attr,
+#else
 	&_SIW_TOUCH_ATTR_T(glove_status).attr,
+#endif
 	&_SIW_TOUCH_ATTR_T(grab_status).attr,
 	&_SIW_TOUCH_ATTR_T(sys_con).attr,
 	NULL,
@@ -1635,13 +1804,25 @@ static int siw_touch_add_sysfs_normal(struct siw_ts *ts)
 	struct device *dev = ts->dev;
 	struct kobject *kobj = &ts->kobj;
 	int ret;
+#if defined(SOMC_TOUCH_BRINGUP)
+	char *path_name = "common_touch";
+#endif
 
 	ret = sysfs_create_group(kobj, &siw_touch_attribute_group_normal);
 	if (ret < 0) {
 		t_dev_err(dev, "failed to add sysfs(normal)\n");
 		goto out;
 	}
-
+#if defined(SOMC_TOUCH_BRINGUP)
+	dev_set_name(&ts->virtdev, "%s", path_name);
+	ret = device_register(&ts->virtdev);
+	if (ret)
+		t_dev_err(dev, "failed virtdev register error\n");
+	dev_set_drvdata(&ts->virtdev, ts);
+	ret = sysfs_create_link(&ts->virtdev.kobj, kobj, "touch");
+	if (ret)
+		t_dev_err(dev, "failed sysfs link error\n");
+#endif
 	ret = siw_ops_sysfs(ts, DRIVER_INIT);
 	if (ret < 0) {
 		t_dev_err(dev, "failed to add sysfs(ops)\n");
