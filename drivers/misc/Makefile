@@ -67,8 +67,6 @@ obj-$(CONFIG_TUSB1064_XR_MISC) += tusb1064.o
 obj-$(CONFIG_VXR200_XR_MISC) += vxr7200.o
 
 
-obj-$(CONFIG_NFC_PN553_DEVICES) += pn553.o
-
 obj-$(CONFIG_LDO_VIBRATOR)	+= ldo_vibrator.o
 
 obj-$(CONFIG_SIM_DETECT)	+= sim_detect.o
