@@ -1182,24 +1182,6 @@ static int mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
 	if (mmc_card_removed(host->card))
 		return -ENOMEDIUM;
 
-#ifdef CONFIG_MMC_CMD_DEBUG
-	if (host->card) {
-		struct mmc_cmdq *cq = NULL;
-		cq = &host->card->cmd_stats.cmdq[host->card->
-						cmd_stats.next_idx];
-		cq->opcode = mrq->cmd->opcode;
-		cq->arg = mrq->cmd->arg;
-		cq->flags = mrq->cmd->flags;
-		cq->timestamp = sched_clock();
-		host->card->cmd_stats.next_idx++;
-
-		if (host->card->cmd_stats.next_idx == CMD_QUEUE_SIZE) {
-			host->card->cmd_stats.next_idx = 0;
-			host->card->cmd_stats.wrapped = 1;
-		}
-	}
-#endif
-
 	if (mrq->sbc) {
 		pr_debug("<%s: starting CMD%u arg %08x flags %08x>\n",
 			 mmc_hostname(host), mrq->sbc->opcode,
@@ -3224,10 +3206,7 @@ int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage, u32 ocr)
 
 	host->card_clock_off = false;
 	/* Wait for at least 1 ms according to spec */
-	if (host->caps & MMC_CAP_NONREMOVABLE)
-		mmc_delay(1);
-	else
-		mmc_delay(40);
+	mmc_delay(1);
 
 	/*
 	 * Failure to switch is indicated by the card holding
