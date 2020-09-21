@@ -590,12 +590,11 @@ fail_setup_event:
 #ifndef CONFIG_HALL_SENSOR_NOT_USE_SWITCH
 	if (ddata->switch_lid.dev)
 		switch_dev_unregister(&ddata->switch_lid);
-	if (ddata->switch_keydock.dev)
+	if (ddata->switch_keydock.dev) {
 		switch_dev_unregister(&ddata->switch_keydock);
-	if (&ddata->input_dev->dev) {
-		input_unregister_device(ddata->input_dev);
-		input_free_device(ddata->input_dev);
-	}
+		}
+	input_unregister_device(ddata->input_dev);
+	input_free_device(ddata->input_dev);
 #else
 	input_unregister_device(ddata->input_dev);
 	input_free_device(ddata->input_dev);
@@ -626,10 +625,10 @@ static int bu520x1nvx_remove(struct platform_device *pdev)
 #ifndef CONFIG_HALL_SENSOR_NOT_USE_SWITCH
 	if (ddata->switch_lid.dev)
 		switch_dev_unregister(&ddata->switch_lid);
-	if (ddata->switch_keydock.dev)
+	if (ddata->switch_keydock.dev) {
 		switch_dev_unregister(&ddata->switch_keydock);
-	if (&ddata->input_dev->dev)
-		input_unregister_device(ddata->input_dev);
+		}
+	input_unregister_device(ddata->input_dev);
 #else
 	input_unregister_device(ddata->input_dev);
 #endif
