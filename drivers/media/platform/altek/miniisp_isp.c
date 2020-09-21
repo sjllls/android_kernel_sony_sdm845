@@ -2021,11 +2021,12 @@ static void __exit mini_isp_exit(void)
 
 	misp_info("%s", __func__);
 
-	if (misp_drv_global_variable->irq_gpio)
+	if (misp_drv_global_variable->irq_gpio) {
 		gpio_free(misp_drv_global_variable->irq_gpio);
+	}
 
 	/*if (misp_drv_global_variable)*/
-		kfree(misp_drv_global_variable);
+	kfree(misp_drv_global_variable);
 
 	/* unregister all driver */
 	spi_unregister_driver(&mini_isp_intf_spi);
