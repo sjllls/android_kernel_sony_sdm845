@@ -712,8 +712,9 @@ static int tcs3490_check_and_report(struct tcs3490_chip *chip)
     u8 saturation;
 
     int ret = tcs3490_read_all(chip);
-    if (ret)
+    if (ret) {
         goto exit_clr;
+	}
 
 	mutex_lock(&chip->lock);
     status = chip->shadow[TCS3490_STATUS];
@@ -1007,8 +1008,9 @@ static ssize_t tcs3490_als_gain_store(struct device *dev,
     if (rc)
         return -EINVAL;
     if (gain != 0 && gain != 1 && gain != 4 && gain != 16 &&
-            gain != 60 && gain != 64)
+            gain != 60 && gain != 64) {
         return -EINVAL;
+	}
 
 	mutex_lock(&chip->lock);
 	if (gain) {
@@ -1073,8 +1075,9 @@ static ssize_t tcs3490_als_itime_store(struct device *dev,
     struct tcs3490_chip *chip = dev_get_drvdata(dev);
 
     rc = kstrtoul(buf, 10, &itime);
-    if (rc)
+    if (rc) {
         return -EINVAL;
+	}
 
 	mutex_lock(&chip->lock);
 	chip->shadow[TCS3490_ALS_TIME] =
