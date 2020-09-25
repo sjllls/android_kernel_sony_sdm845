@@ -1,0 +1,36 @@
+### BUILD in Clang and gcc 7.5 ###
+
+## Download gcc 7.5 :
+# 64bit:
+https://releases.linaro.org/components/toolchain/binaries/latest-7/aarch64-linux-gnu/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu.tar.xz
+# 32bit:
+https://releases.linaro.org/components/toolchain/binaries/latest-7/arm-linux-gnueabi/gcc-linaro-7.5.0-2019.12-x86_64_arm-linux-gnueabi.tar.xz
+
+# Download Clang:
+https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/android-10.0.0_r3/clang-r353983c.tar.gz
+
+# Download necessary tools
+https://codeload.github.com/sjllls/android_kernel_sony_sdm845/zip/tools
+
+
+----------------------------------------------------------------------------------
+
+# Compile
+export ARCH=arm64
+export SUBARCH=arm64
+export DTC_EXT=/home/sjll/tool/dtc
+export DTC_OVERLAY_TEST_EXT=/home/sjll/tool/ufdt_apply_overlay_host
+export PATH=/home/sjll/gcc-linaro-7.5-aarch64/bin:$PATH
+export PATH=/home/sjll/gcc-linaro-7.5-armeabi/bin:$PATH
+export CROSS_COMPILE=aarch64-linux-gnu-
+export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+export CC=clang
+export CLANG_TRIPLE=aarch64-linux-gnu-
+
+# For XZ2
+make O=out tama_akari_defconfig
+make -j$(nproc --all) O=out
+
+# For XZ2C
+make O=out tama_apollo_defconfig
+make -j$(nproc --all) O=out
