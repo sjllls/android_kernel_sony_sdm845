@@ -1473,4 +1473,6 @@ config TOUCHSCREEN_RAYDIUM_CHIPSET
 
 	  If unsure, say N.
 
+source "drivers/input/touchscreen/atmel_mxt640u/Kconfig"
+
 endif
