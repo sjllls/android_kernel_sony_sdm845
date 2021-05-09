@@ -22,6 +22,7 @@ obj-$(CONFIG_TOUCHSCREEN_CLEARPAD_RMI_DEV)	+= clearpad_rmi_dev.o
 obj-$(CONFIG_TOUCHSCREEN_CLEARPAD)	+= clearpad_core.o
 obj-$(CONFIG_TOUCHSCREEN_CLEARPAD_I2C)	+= clearpad_i2c.o
 obj-$(CONFIG_TOUCHSCREEN_SYNAPTICS_TCM) += synaptics_tcm/
+obj-$(CONFIG_TOUCHSCREEN_ATMEL_MXT640U)		+= atmel_mxt640u/
 obj-$(CONFIG_TOUCHSCREEN_CY8CTMG110)	+= cy8ctmg110_ts.o
 obj-$(CONFIG_TOUCHSCREEN_CYTTSP_CORE)	+= cyttsp_core.o
 obj-$(CONFIG_TOUCHSCREEN_CYTTSP_I2C)	+= cyttsp_i2c.o cyttsp_i2c_common.o
