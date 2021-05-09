@@ -1465,4 +1465,6 @@ config TOUCHSCREEN_EKTF3XXX_CHIPSET
 
 		  If unusre, say N.
 
+source "drivers/input/touchscreen/atmel_mxt640u/Kconfig"
+
 endif

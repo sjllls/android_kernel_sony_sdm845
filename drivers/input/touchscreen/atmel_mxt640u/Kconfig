@@ -1,0 +1,11 @@
+menu "Atmel Touch Support"
+
+config TOUCHSCREEN_ATMEL_MXT640U
+	tristate "Atmel mxt640u Touchscreen Driver"
+	depends on I2C
+	default n
+	help
+	  Say Y here if you have a touchscreen interface using
+	  the Atmel mxt640u touch device.
+
+endmenu
