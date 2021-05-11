@@ -79,7 +79,6 @@ enum dsi_op_mode {
  * @DSI_MODE_FLAG_DMS: Seamless transition is dynamic mode switch
  * @DSI_MODE_FLAG_VRR: Seamless transition is DynamicFPS.
  *                     New timing values are sent from DAL.
- * @DSI_MODE_FLAG_DYN_CLK: Seamless transition is dynamic clock change
  */
 enum dsi_mode_flags {
 	DSI_MODE_FLAG_SEAMLESS			= BIT(0),
@@ -87,7 +86,6 @@ enum dsi_mode_flags {
 	DSI_MODE_FLAG_VBLANK_PRE_MODESET	= BIT(2),
 	DSI_MODE_FLAG_DMS			= BIT(3),
 	DSI_MODE_FLAG_VRR			= BIT(4),
-	DSI_MODE_FLAG_DYN_CLK			= BIT(5),
 };
 
 /**
@@ -244,6 +242,16 @@ enum dsi_dfps_type {
  * @DSI_CMD_SET_ROI:			   Panel ROI update
  * @DSI_CMD_SET_TIMING_SWITCH:             Timing switch
  * @DSI_CMD_SET_POST_TIMING_SWITCH:        Post timing switch
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+ * @DSI_CMD_SET_M_PLUS_PEAK1000:           M+ mode 1
+ * @DSI_CMD_SET_M_PLUS_PEAK700:            M+ mode 2
+ * @DSI_CMD_SET_M_PLUS_PEAK600:            M+ mode 3
+ * @DSI_CMD_SET_M_PLUS_OFF:                M+ mode 4
+ * @DSI_CMD_SET_FPS_MODE_OFF_RR_OFF:       fps mode off / report rate off
+ * @DSI_CMD_SET_FPS_MODE_OFF_RR_ON:        fps mode off / report rate on
+ * @DSI_CMD_SET_FPS_MODE_ON_RR_OFF:        fps mode on / report rate off
+ * @DSI_CMD_SET_FPS_MODE_ON_RR_ON:         fps mode on / report rate on
+#endif / CONFIG_DRM_SDE_SPECIFIC_PANEL /
  * @DSI_CMD_SET_MAX
  */
 enum dsi_cmd_set_type {
@@ -268,6 +276,24 @@ enum dsi_cmd_set_type {
 	DSI_CMD_SET_ROI,
 	DSI_CMD_SET_TIMING_SWITCH,
 	DSI_CMD_SET_POST_TIMING_SWITCH,
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+	DSI_CMD_SET_M_PLUS_PEAK1000,
+	DSI_CMD_SET_M_PLUS_PEAK700,
+	DSI_CMD_SET_M_PLUS_PEAK600,
+	DSI_CMD_SET_M_PLUS_OFF,
+	DSI_CMD_SET_FPS_MODE_OFF_RR_OFF,
+	DSI_CMD_SET_FPS_MODE_OFF_RR_ON,
+	DSI_CMD_SET_FPS_MODE_ON_RR_OFF,
+	DSI_CMD_SET_FPS_MODE_ON_RR_ON,
+	DSI_CMD_SET_AOD_ON,
+	DSI_CMD_SET_AOD_LOW,
+	DSI_CMD_SET_AOD_HIGH,
+	DSI_CMD_SET_AOD_OFF,
+	DSI_CMD_SET_VR_ON,
+	DSI_CMD_SET_VR_OFF,
+	DSI_CMD_SET_DISPLAY_OFF,
+	DSI_CMD_SET_DISPLAY_ON,
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 	DSI_CMD_SET_MAX
 };
 
@@ -545,6 +571,9 @@ struct dsi_display_mode {
 	u32 pixel_clk_khz;
 	u32 dsi_mode_flags;
 	struct dsi_display_mode_priv_info *priv_info;
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+	bool isDefault;
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 };
 
 /**
@@ -597,50 +626,12 @@ struct dsi_event_cb_info {
  * @DSI_FIFO_OVERFLOW:     DSI FIFO Overflow error
  * @DSI_FIFO_UNDERFLOW:    DSI FIFO Underflow error
  * @DSI_LP_Rx_TIMEOUT:     DSI LP/RX Timeout error
- * @DSI_PLL_UNLOCK_ERR:	   DSI PLL unlock error
  */
 enum dsi_error_status {
 	DSI_FIFO_OVERFLOW = 1,
 	DSI_FIFO_UNDERFLOW,
 	DSI_LP_Rx_TIMEOUT,
-	DSI_PLL_UNLOCK_ERR,
 	DSI_ERR_INTR_ALL,
 };
 
-/* structure containing the delays required for dynamic clk */
-struct dsi_dyn_clk_delay {
-	u32 pipe_delay;
-	u32 pipe_delay2;
-	u32 pll_delay;
-};
-
-/* dynamic refresh control bits */
-enum dsi_dyn_clk_control_bits {
-	DYN_REFRESH_INTF_SEL = 1,
-	DYN_REFRESH_SYNC_MODE,
-	DYN_REFRESH_SW_TRIGGER,
-	DYN_REFRESH_SWI_CTRL,
-};
-
-/* convert dsi pixel format into bits per pixel */
-static inline int dsi_pixel_format_to_bpp(enum dsi_pixel_format fmt)
-{
-	switch (fmt) {
-	case DSI_PIXEL_FORMAT_RGB888:
-	case DSI_PIXEL_FORMAT_MAX:
-		return 24;
-	case DSI_PIXEL_FORMAT_RGB666:
-	case DSI_PIXEL_FORMAT_RGB666_LOOSE:
-		return 18;
-	case DSI_PIXEL_FORMAT_RGB565:
-		return 16;
-	case DSI_PIXEL_FORMAT_RGB111:
-		return 3;
-	case DSI_PIXEL_FORMAT_RGB332:
-		return 8;
-	case DSI_PIXEL_FORMAT_RGB444:
-		return 12;
-	}
-	return 24;
-}
 #endif /* _DSI_DEFS_H_ */
